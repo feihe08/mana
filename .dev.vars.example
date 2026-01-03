@@ -1,0 +1,8 @@
+# Cloudflare 开发环境变量示例
+# 复制此文件为 .dev.vars 并填入实际的值
+
+# D1 数据库 ID（本地开发时可以为空，wrangler 会自动创建）
+# D1_DATABASE_ID=
+
+# R2 Bucket 名称
+# R2_BUCKET_NAME=mana-uploads

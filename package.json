@@ -1,0 +1,39 @@
+{
+  "name": "mana",
+  "private": true,
+  "sideEffects": false,
+  "type": "module",
+  "scripts": {
+    "dev": "react-router dev",
+    "build": "react-router build",
+    "start": "wrangler pages dev --compatibility-date=2023-12-01 --proxy=3000 -- ./public",
+    "deploy": "npm run build && wrangler pages deploy ./public",
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "@react-router/cloudflare": "^7.11.0",
+    "@react-router/node": "^7.11.0",
+    "@react-router/serve": "^7.11.0",
+    "isbot": "^5.1.17",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router": "^7.11.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241218.0",
+    "@react-router/dev": "^7.11.0",
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/react": "^19.0.6",
+    "@types/react-dom": "^19.0.2",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7",
+    "vite-tsconfig-paths": "^5.1.4",
+    "wrangler": "^3.94.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
