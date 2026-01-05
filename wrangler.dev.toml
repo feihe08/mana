@@ -1,0 +1,17 @@
+name = "mana-dev"
+compatibility_date = "2024-01-01"
+pages_build_output_dir = "./public"
+
+# 本地开发配置
+# 使用本地 D1 数据库（自动创建）
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mana-db-local"
+database_id = "local"
+# 本地开发时会自动创建内存数据库
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "mana-uploads-local"
+# 本地开发时会使用本地文件系统模拟

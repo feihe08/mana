@@ -4,6 +4,28 @@ export function meta() {
   ];
 }
 
+/**
+ * Loader - 验证环境配置
+ */
+export async function loader({ context }: { context: { env: import("../cloudflare").Env } }) {
+  // TODO: 在下一个任务中实现文件上传 action
+  return {
+    ready: true,
+  };
+}
+
+/**
+ * Action - 处理文件上传
+ * TODO: 在下一个任务中实现完整的上传逻辑
+ */
+export async function action({ request, context }: {
+  request: Request;
+  context: { env: import("../cloudflare").Env };
+}) {
+  // 占位符 - 下一个任务实现
+  return { message: "File upload not implemented yet" };
+}
+
 export default function NewBill() {
   return (
     <div className="min-h-screen bg-gray-50">

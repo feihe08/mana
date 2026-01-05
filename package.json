@@ -5,10 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "react-router dev",
+    "dev:cloudflare": "wrangler pages dev --compatibility-date=2024-01-01 --proxy=3000 -- ./public",
     "build": "react-router build",
-    "start": "wrangler pages dev --compatibility-date=2023-12-01 --proxy=3000 -- ./public",
+    "start": "wrangler pages dev --compatibility-date=2024-01-01 --proxy=3000 -- ./public",
     "deploy": "npm run build && wrangler pages deploy ./public",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "db:init": "wrangler d1 execute mana-db --local --file=app/lib/db/schema.sql",
+    "db:migrate": "wrangler d1 execute mana-db --file=app/lib/db/schema.sql"
   },
   "dependencies": {
     "@react-router/cloudflare": "^7.11.0",
