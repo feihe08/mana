@@ -30,3 +30,6 @@ coverage
 
 # Vite
 .vite
+
+# React Router
+.react-router
