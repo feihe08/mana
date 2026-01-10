@@ -1,5 +1,5 @@
 import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
-import stylesheet from "@/app/styles.css?url";
+import stylesheet from "~/styles.css?url";
 import type { Env } from "./cloudflare";
 
 export const links = () => [
