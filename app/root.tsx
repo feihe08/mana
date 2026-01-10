@@ -10,16 +10,16 @@ export const links = () => [
  * Root loader - 获取 Cloudflare 环境变量
  * 这些变量会通过 context 传递给所有子路由的 loader 和 action
  */
-export async function loader({ context }: { context: { env: Env } }) {
-  // 验证必需的环境变量
-  if (!context.env.DB) {
-    throw new Error("DB is not available in context.env");
-  }
+export async function loader({ context }: { context: { env?: Env } }) {
+  // 在本地开发环境下，context.env 可能为 undefined
+  // 只在生产环境（Cloudflare）中才可用
+  const env = context?.env;
 
   return {
     env: {
-      hasDB: !!context.env.DB,
-      hasBucket: !!context.env.BUCKET,
+      hasDB: !!env?.DB,
+      hasBucket: !!env?.BUCKET,
+      isCloudflare: !!env,
     },
   };
 }
