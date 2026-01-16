@@ -1,3 +1,8 @@
+import { useState } from "react";
+import { useActionData, useNavigation } from "react-router";
+import { BillPreview, type BillRecord } from "~/components/BillPreview";
+import { parseBillFile, categorizeBills, DEFAULT_CATEGORIES } from "~/lib/client/parsers";
+
 export function meta() {
   return [
     { title: "上传账单 - Mana" },
@@ -5,28 +10,198 @@ export function meta() {
 }
 
 /**
- * Loader - 验证环境配置
- */
-export async function loader({ context }: { context: { env: import("../cloudflare").Env } }) {
-  // TODO: 在下一个任务中实现文件上传 action
-  return {
-    ready: true,
-  };
-}
-
-/**
- * Action - 处理文件上传
- * TODO: 在下一个任务中实现完整的上传逻辑
+ * Action - 接收解析后的账单数据
  */
 export async function action({ request, context }: {
   request: Request;
   context: { env: import("../cloudflare").Env };
 }) {
-  // 占位符 - 下一个任务实现
-  return { message: "File upload not implemented yet" };
+  const db = context.env?.DB;
+
+  // 检查数据库是否可用
+  if (!db) {
+    return {
+      error: "数据库未配置。请在本地开发环境运行 `pnpm db:init` 初始化数据库。",
+    };
+  }
+
+  try {
+    const body = await request.json();
+    const { bills } = body as { bills: Array<BillRecord & { source: string }> };
+
+    if (!bills || !Array.isArray(bills) || bills.length === 0) {
+      return { error: "没有有效的账单数据" };
+    }
+
+    // 转换数据格式以匹配数据库
+    const dbBills = bills.map((bill) => ({
+      id: bill.id,
+      source: bill.source,
+      amount: bill.amount,
+      category: bill.category,
+      description: bill.description,
+      transactionDate: bill.date,
+      originalData: JSON.stringify(bill.originalData || {}),
+    }));
+
+    // 批量保存到数据库
+    const { createBills } = await import("~/lib/db");
+    await createBills(db, dbBills);
+
+    return {
+      success: true,
+      message: `成功导入 ${bills.length} 条账单记录`,
+      count: bills.length,
+    };
+  } catch (error) {
+    console.error("保存失败:", error);
+    return {
+      error: `保存失败: ${error instanceof Error ? error.message : "未知错误"}`,
+    };
+  }
 }
 
 export default function NewBill() {
+  const actionData = useActionData<typeof action>();
+  const navigation = useNavigation();
+
+  // 状态管理
+  const [step, setStep] = useState<"upload" | "preview">("upload");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedSource, setSelectedSource] = useState<string>("");
+  const [bills, setBills] = useState<Array<BillRecord & { source: string }>>([]);
+  const [parseError, setParseError] = useState<string | null>(null);
+  const [isParsing, setIsParsing] = useState(false);
+
+  const isSubmitting = navigation.state === "submitting";
+
+  // 处理文件选择
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      setParseError(null);
+    }
+  };
+
+  // 处理解析
+  const handleParse = async () => {
+    if (!selectedFile || !selectedSource) {
+      setParseError("请选择文件和账单来源");
+      return;
+    }
+
+    // 验证文件大小（10MB）
+    const MAX_SIZE = 10 * 1024 * 1024;
+    if (selectedFile.size > MAX_SIZE) {
+      setParseError("文件大小不能超过 10MB");
+      return;
+    }
+
+    // 验证文件类型
+    const fileName = selectedFile.name.toLowerCase();
+    const isValidExtension = fileName.endsWith(".csv") || fileName.endsWith(".xlsx") || fileName.endsWith(".xls");
+
+    if (!isValidExtension) {
+      setParseError("不支持的文件格式，请上传 CSV 或 Excel 文件");
+      return;
+    }
+
+    setIsParsing(true);
+    setParseError(null);
+
+    try {
+      // 解析文件
+      const parsedBills = await parseBillFile(selectedFile, selectedSource);
+
+      if (parsedBills.length === 0) {
+        setParseError("未找到有效的账单数据，请检查文件格式");
+        setIsParsing(false);
+        return;
+      }
+
+      // 自动分类
+      const categorizedBills = categorizeBills(parsedBills).map((bill) => ({
+        id: bill.id,
+        date: bill.transactionDate,
+        description: bill.description,
+        amount: bill.amount,
+        category: bill.category,
+        source: selectedSource,
+        originalData: bill.originalData,
+      }));
+
+      setBills(categorizedBills);
+      setStep("preview");
+    } catch (error) {
+      console.error("解析失败:", error);
+      setParseError(`文件解析失败: ${error instanceof Error ? error.message : "未知错误"}`);
+    } finally {
+      setIsParsing(false);
+    }
+  };
+
+  // 处理重新分类
+  const handleRecategorize = async (selectedBills: BillRecord[]) => {
+    // 对选中的记录使用不同的分类策略（随机打乱关键词顺序）
+    const shuffledCategories = [...DEFAULT_CATEGORIES].sort(() => Math.random() - 0.5);
+
+    const updatedBills = bills.map((bill) => {
+      if (selectedBills.some(sb => sb.id === bill.id)) {
+        // 重新分类
+        let bestMatch = "未分类";
+        let maxScore = 0;
+
+        const normalizedDesc = bill.description.toLowerCase();
+
+        for (const category of shuffledCategories) {
+          let score = 0;
+
+          for (const keyword of category.keywords) {
+            if (normalizedDesc.includes(keyword.toLowerCase())) {
+              score += 1 + Math.random(); // 添加随机权重
+            }
+          }
+
+          if (score > maxScore) {
+            maxScore = score;
+            bestMatch = category.name;
+          }
+        }
+
+        return { ...bill, category: bestMatch };
+      }
+      return bill;
+    });
+
+    setBills(updatedBills);
+  };
+
+  // 处理确认上传
+  const handleConfirm = async (billsToUpload: BillRecord[]) => {
+    try {
+      await fetch("", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ bills: billsToUpload }),
+      });
+      // 成功后会刷新页面，actionData 会包含结果
+    } catch (error) {
+      console.error("上传失败:", error);
+    }
+  };
+
+  // 重置表单
+  const handleReset = () => {
+    setStep("upload");
+    setSelectedFile(null);
+    setSelectedSource("");
+    setBills([]);
+    setParseError(null);
+  };
+
   return (
     <div className="min-h-screen bg-gray-950 relative">
       {/* 背景装饰 */}
@@ -34,7 +209,7 @@ export default function NewBill() {
       <div className="absolute top-0 right-0 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl" />
 
       <div className="relative container mx-auto px-4 py-8">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           {/* 返回链接 */}
           <a
             href="/"
@@ -49,87 +224,151 @@ export default function NewBill() {
           <h1 className="text-4xl font-bold text-white mb-2">上传账单</h1>
           <p className="text-gray-400 mb-8">支持支付宝、微信、银行卡等多种格式</p>
 
-          {/* 上传表单 */}
-          <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-8 backdrop-blur-sm">
-            <form method="post" encType="multipart/form-data" className="space-y-6">
-              <div>
-                <label htmlFor="source" className="block text-sm font-medium text-gray-300 mb-3">
-                  账单来源
-                </label>
-                <select
-                  id="source"
-                  name="source"
-                  required
-                  className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-                >
-                  <option value="">请选择</option>
-                  <option value="alipay">支付宝</option>
-                  <option value="wechat">微信支付</option>
-                  <option value="bank">银行卡</option>
-                  <option value="csv">CSV 文件</option>
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="file" className="block text-sm font-medium text-gray-300 mb-3">
-                  账单文件
-                </label>
-                <div className="relative">
-                  <input
-                    type="file"
-                    id="file"
-                    name="file"
-                    required
-                    accept=".csv,.xlsx,.xls"
-                    className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-purple-600 file:text-white file:cursor-pointer hover:file:bg-purple-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-                  />
+          {/* Action 消息 */}
+          {actionData?.error && (
+            <div className="mb-6 bg-red-500/10 border border-red-500/50 rounded-xl p-4 backdrop-blur-sm">
+              <div className="flex items-start gap-3">
+                <svg className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <h3 className="text-red-400 font-semibold mb-1">上传失败</h3>
+                  <p className="text-red-300 text-sm">{actionData.error}</p>
                 </div>
-                <p className="mt-3 text-sm text-gray-500 flex items-center gap-2">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  支持 CSV、Excel 格式，文件大小不超过 10MB
-                </p>
+              </div>
+            </div>
+          )}
+
+          {actionData?.success && (
+            <div className="mb-6 bg-green-500/10 border border-green-500/50 rounded-xl p-4 backdrop-blur-sm">
+              <div className="flex items-start gap-3">
+                <svg className="w-5 h-5 text-green-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <h3 className="text-green-400 font-semibold mb-1">上传成功</h3>
+                  <p className="text-green-300 text-sm">{actionData.message}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 步骤 1: 上传表单 */}
+          {step === "upload" && (
+            <>
+              <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-8 backdrop-blur-sm">
+                <div className="space-y-6">
+                  <div>
+                    <label htmlFor="source" className="block text-sm font-medium text-gray-300 mb-3">
+                      账单来源
+                    </label>
+                    <select
+                      id="source"
+                      value={selectedSource}
+                      onChange={(e) => setSelectedSource(e.target.value)}
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                    >
+                      <option value="">请选择</option>
+                      <option value="alipay">支付宝</option>
+                      <option value="wechat">微信支付</option>
+                      <option value="bank">银行卡</option>
+                      <option value="csv">CSV 文件</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label htmlFor="file" className="block text-sm font-medium text-gray-300 mb-3">
+                      账单文件
+                    </label>
+                    <input
+                      type="file"
+                      id="file"
+                      onChange={handleFileChange}
+                      accept=".csv,.xlsx,.xls"
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-purple-600 file:text-white file:cursor-pointer hover:file:bg-purple-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                    />
+                    {selectedFile && (
+                      <p className="mt-3 text-sm text-gray-400">
+                        已选择: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
+                      </p>
+                    )}
+                    <p className="mt-2 text-sm text-gray-500 flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      支持 CSV、Excel 格式，文件大小不超过 10MB
+                    </p>
+                  </div>
+
+                  {/* 解析错误提示 */}
+                  {parseError && (
+                    <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-4">
+                      <p className="text-red-300 text-sm">{parseError}</p>
+                    </div>
+                  )}
+
+                  <div className="flex gap-4">
+                    <button
+                      onClick={handleParse}
+                      disabled={!selectedFile || !selectedSource || isParsing}
+                      className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white py-4 rounded-xl font-semibold transition-all duration-300 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+                    >
+                      {isParsing ? (
+                        <>
+                          <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          解析中...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          解析文件
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              <button
-                type="submit"
-                className="group w-full relative bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white py-4 rounded-xl font-semibold transition-all duration-300 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 flex items-center justify-center gap-3"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                开始分析
-                <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
-              </button>
-            </form>
-          </div>
+              {/* 使用提示 */}
+              <div className="mt-8 bg-gray-900/30 border border-gray-800/50 rounded-2xl p-6 backdrop-blur-sm">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <svg className="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                  </svg>
+                  使用提示
+                </h3>
+                <ul className="space-y-3 text-sm text-gray-400">
+                  <li className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-purple-500 mt-2 flex-shrink-0" />
+                    <span><strong className="text-gray-300">支付宝：</strong>在支付宝 App 中搜索"账单"，导出 CSV 格式账单</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-2 flex-shrink-0" />
+                    <span><strong className="text-gray-300">微信支付：</strong>在微信钱包中点击"账单"，下载交易明细</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-pink-500 mt-2 flex-shrink-0" />
+                    <span><strong className="text-gray-300">银行卡：</strong>从网上银行或手机银行导出对账单</span>
+                  </li>
+                </ul>
+              </div>
+            </>
+          )}
 
-          {/* 使用提示 */}
-          <div className="mt-8 bg-gray-900/30 border border-gray-800/50 rounded-2xl p-6 backdrop-blur-sm">
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <svg className="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-              </svg>
-              使用提示
-            </h3>
-            <ul className="space-y-3 text-sm text-gray-400">
-              <li className="flex items-start gap-3">
-                <div className="w-1.5 h-1.5 rounded-full bg-purple-500 mt-2 flex-shrink-0" />
-                <span><strong className="text-gray-300">支付宝：</strong>在支付宝 App 中搜索"账单"，导出 CSV 格式账单</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-2 flex-shrink-0" />
-                <span><strong className="text-gray-300">微信支付：</strong>在微信钱包中点击"账单"，下载交易明细</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <div className="w-1.5 h-1.5 rounded-full bg-pink-500 mt-2 flex-shrink-0" />
-                <span><strong className="text-gray-300">银行卡：</strong>从网上银行或手机银行导出对账单</span>
-              </li>
-            </ul>
-          </div>
+          {/* 步骤 2: 预览和确认 */}
+          {step === "preview" && (
+            <BillPreview
+              bills={bills}
+              onRecategorize={handleRecategorize}
+              onConfirm={handleConfirm}
+              onCancel={handleReset}
+            />
+          )}
         </div>
       </div>
     </div>

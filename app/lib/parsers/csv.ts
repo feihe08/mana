@@ -1,7 +1,9 @@
 /**
  * CSV 解析器
- * 用于解析通用的 CSV 格式账单
+ * 用于解析通用的 CSV/Excel 格式账单
  */
+
+import * as XLSX from "xlsx";
 
 export interface ParsedBill {
   id: string;
@@ -11,8 +13,29 @@ export interface ParsedBill {
   originalData: Record<string, any>;
 }
 
+/**
+ * 读取文件为文本（支持 CSV 和 Excel）
+ */
+async function readFileAsText(file: File): Promise<string> {
+  const fileName = file.name.toLowerCase();
+
+  // 如果是 Excel 文件，先转换为 CSV
+  if (fileName.endsWith(".xlsx") || fileName.endsWith(".xls")) {
+    const arrayBuffer = await file.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, { type: "array" });
+    const firstSheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[firstSheetName];
+
+    // 将 Excel 转换为 CSV 格式的字符串
+    return XLSX.utils.sheet_to_csv(worksheet);
+  }
+
+  // CSV 文件直接读取
+  return await file.text();
+}
+
 export async function parseCSV(file: File): Promise<ParsedBill[]> {
-  const text = await file.text();
+  const text = await readFileAsText(file);
   const lines = text.split('\n').filter(line => line.trim());
 
   if (lines.length < 2) {

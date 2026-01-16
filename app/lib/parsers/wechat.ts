@@ -1,12 +1,34 @@
 /**
  * 微信账单解析器
- * 解析微信支付导出的 CSV 账单文件
+ * 解析微信支付导出的 CSV/Excel 账单文件
  */
 
+import * as XLSX from "xlsx";
 import type { ParsedBill } from './csv';
 
+/**
+ * 读取文件为文本（支持 CSV 和 Excel）
+ */
+async function readFileAsText(file: File): Promise<string> {
+  const fileName = file.name.toLowerCase();
+
+  // 如果是 Excel 文件，先转换为 CSV
+  if (fileName.endsWith(".xlsx") || fileName.endsWith(".xls")) {
+    const arrayBuffer = await file.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, { type: "array" });
+    const firstSheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[firstSheetName];
+
+    // 将 Excel 转换为 CSV 格式的字符串
+    return XLSX.utils.sheet_to_csv(worksheet);
+  }
+
+  // CSV 文件直接读取
+  return await file.text();
+}
+
 export async function parseWechatCSV(file: File): Promise<ParsedBill[]> {
-  const text = await file.text();
+  const text = await readFileAsText(file);
   const lines = text.split('\n').filter(line => line.trim());
 
   // 微信账单格式示例：
@@ -44,9 +66,12 @@ export async function parseWechatCSV(file: File): Promise<ParsedBill[]> {
       continue;
     }
 
+    // 解析金额：去掉 ¥ 符号和逗号
+    const amountValue = parseFloat((amount || '0').replace(/[¥,]/g, ''));
+
     const bill: ParsedBill = {
       id: `wechat-${Date.now()}-${i}`,
-      amount: Math.abs(parseFloat(amount || '0')),
+      amount: Math.abs(amountValue),
       description: description || counterparty || type || '',
       transactionDate: parseWechatDate(time || ''),
       originalData: {
@@ -62,7 +87,7 @@ export async function parseWechatCSV(file: File): Promise<ParsedBill[]> {
       },
     };
 
-    if (!isNaN(bill.amount)) {
+    if (!isNaN(bill.amount) && bill.amount > 0) {
       bills.push(bill);
     }
   }
