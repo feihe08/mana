@@ -5,6 +5,12 @@ node_modules
 # Build output
 .build
 public/build
+build/
+
+# Cloudflare
+.wrangler/
+.dev.vars
+wrangler.toml.backup
 
 # Misc
 .DS_Store
