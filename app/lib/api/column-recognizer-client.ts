@@ -36,6 +36,7 @@ export async function recognizeColumns(
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ error: 'Unknown error' })) as { error?: string };
+    console.error('❌ [AI API] Error:', errorData);
     throw new Error(errorData.error || 'AI 识别服务暂时不可用');
   }
 

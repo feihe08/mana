@@ -26,33 +26,31 @@ export async function parseBillWithAI(
   source: string,
   options: SmartParserOptions = {}
 ): Promise<ParsedBill[]> {
-  const cache = new ColumnMappingCache();
+  // const cache = new ColumnMappingCache();
 
   // 1. 读取文件，提取表头
   const { headers, csvText } = await extractHeaders(file);
 
-  // 2. 检查缓存（除非强制重新识别）
-  let mapping = options.forceReidentify
-    ? null
-    : cache.get(source, headers);
+  // 2. 检查缓存（开发阶段禁用缓存，便于调试）
+  // let mapping = options.forceReidentify
+  //   ? null
+  //   : cache.get(source, headers);
 
-  // 3. 如果没有缓存，调用 AI API
-  if (!mapping) {
-    options.onRecognizing?.(true);
+  // 3. 直接调用 AI API（不使用缓存）
+  options.onRecognizing?.(true);
 
-    try {
-      const result = await recognizeColumns(headers, source);
-      mapping = result.mapping;
+  try {
+    const result = await recognizeColumns(headers, source);
+    const mapping = result.mapping;
 
-      // 4. 缓存映射
-      cache.set(source, headers, mapping, result.confidence);
-    } finally {
-      options.onRecognizing?.(false);
-    }
+    // 4. 缓存映射（开发阶段禁用）
+    // cache.set(source, headers, mapping, result.confidence);
+
+    // 5. 使用映射解析数据
+    return parseCSVWithMapping(csvText, mapping);
+  } finally {
+    options.onRecognizing?.(false);
   }
-
-  // 5. 使用映射解析数据
-  return parseCSVWithMapping(csvText, mapping);
 }
 
 /**
@@ -69,11 +67,16 @@ async function extractHeaders(file: File): Promise<{ headers: string[]; csvText:
     const csvText = XLSX.utils.sheet_to_csv(worksheet);
     const lines = csvText.split('\n').filter(line => line.trim());
 
-    // 找到表头行
+    // 找到表头行（包含"交易时间"且有足够的非空列）
     for (let i = 0; i < Math.min(30, lines.length); i++) {
-      if (lines[i].includes('交易时间') || lines[i].includes('时间') || lines[i].includes('Time')) {
+      const cols = parseCSVLine(lines[i]);
+      const hasTimeKeyword = lines[i].includes('交易时间') || lines[i].includes('时间') || lines[i].includes('Time');
+      const nonEmptyCols = cols.filter(col => col.trim().length > 0).length;
+      const hasEnoughCols = nonEmptyCols >= 5; // 至少有5个非空列
+
+      if (hasTimeKeyword && hasEnoughCols) {
         return {
-          headers: parseCSVLine(lines[i]),
+          headers: cols,
           csvText,
         };
       }
@@ -86,10 +89,22 @@ async function extractHeaders(file: File): Promise<{ headers: string[]; csvText:
   const csvText = await file.text();
   const lines = csvText.split('\n').filter(line => line.trim());
 
-  return {
-    headers: parseCSVLine(lines[0]),
-    csvText,
-  };
+  // 对 CSV 也使用相同的逻辑（跳过说明行）
+  for (let i = 0; i < Math.min(30, lines.length); i++) {
+    const cols = parseCSVLine(lines[i]);
+    const hasTimeKeyword = lines[i].includes('交易时间') || lines[i].includes('时间') || lines[i].includes('Time');
+    const nonEmptyCols = cols.filter(col => col.trim().length > 0).length;
+    const hasEnoughCols = nonEmptyCols >= 5; // 至少有5个非空列
+
+    if (hasTimeKeyword && hasEnoughCols) {
+      return {
+        headers: cols,
+        csvText,
+      };
+    }
+  }
+
+  throw new Error('未找到表头行');
 }
 
 /**
