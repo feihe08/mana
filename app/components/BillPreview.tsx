@@ -21,6 +21,26 @@ interface BillPreviewProps {
   onCancel: () => void;
 }
 
+/**
+ * 安全的日期格式化函数
+ * 确保服务器和客户端输出一致，避免 hydration 错误
+ */
+function formatDate(dateString: string): string {
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '-';
+
+    // 使用固定格式，避免时区问题
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+  } catch {
+    return '-';
+  }
+}
+
 export function BillPreview({ bills, onRecategorize, onConfirm, onCancel }: BillPreviewProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isRecategorizing, setIsRecategorizing] = useState(false);
@@ -172,7 +192,7 @@ export function BillPreview({ bills, onRecategorize, onConfirm, onCancel }: Bill
                 />
               </div>
               <div className="col-span-3 text-sm text-gray-300 flex items-center">
-                {new Date(bill.date).toLocaleDateString("zh-CN")}
+                {formatDate(bill.date)}
               </div>
               <div className="col-span-4 text-sm text-gray-300 flex items-center truncate">
                 {bill.description}

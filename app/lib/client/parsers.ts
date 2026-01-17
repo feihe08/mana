@@ -7,9 +7,18 @@ import * as XLSX from "xlsx";
 import { parseAlipayCSV } from "../parsers/alipay";
 import { parseWechatCSV } from "../parsers/wechat";
 import { parseCSV } from "../parsers/csv";
+import { parseBillWithAI } from "../parsers/smart-parser";
 import type { ParsedBill } from "../parsers/csv";
 
 export type { ParsedBill };
+
+/**
+ * 智能解析选项
+ */
+export interface SmartParseOptions {
+  forceReidentify?: boolean;
+  onRecognizing?: (isRecognizing: boolean) => void;
+}
 
 /**
  * 读取文件为文本（支持 CSV 和 Excel）
@@ -34,19 +43,34 @@ async function readFileAsText(file: File): Promise<string> {
 }
 
 /**
- * 根据来源解析账单文件
+ * 根据来源解析账单文件（使用 AI 智能识别）
  */
-export async function parseBillFile(file: File, source: string): Promise<ParsedBill[]> {
-  switch (source) {
-    case "alipay":
-      return await parseAlipayCSV(file);
-    case "wechat":
-      return await parseWechatCSV(file);
-    case "bank":
-    case "csv":
-      return await parseCSV(file);
-    default:
-      throw new Error(`不支持的账单来源: ${source}`);
+export async function parseBillFile(
+  file: File,
+  source: string,
+  options?: SmartParseOptions
+): Promise<ParsedBill[]> {
+  try {
+    // 使用智能解析器（AI + 缓存）
+    return await parseBillWithAI(file, source, {
+      forceReidentify: options?.forceReidentify,
+      onRecognizing: options?.onRecognizing,
+    });
+  } catch (error) {
+    // 如果 AI 解析失败，降级到传统解析器
+    console.warn('AI 解析失败，使用传统解析器:', error);
+
+    switch (source) {
+      case "alipay":
+        return await parseAlipayCSV(file);
+      case "wechat":
+        return await parseWechatCSV(file);
+      case "bank":
+      case "csv":
+        return await parseCSV(file);
+      default:
+        throw new Error(`不支持的账单来源: ${source}`);
+    }
   }
 }
 

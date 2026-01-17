@@ -73,14 +73,74 @@ export default function NewBill() {
   const [parseError, setParseError] = useState<string | null>(null);
   const [isParsing, setIsParsing] = useState(false);
 
+  // AI 识别状态
+  const [isRecognizing, setIsRecognizing] = useState(false);
+  const [mappingInfo, setMappingInfo] = useState<{ confidence: number } | null>(null);
+  const [recognizeError, setRecognizeError] = useState<string | null>(null);
+
   const isSubmitting = navigation.state === "submitting";
 
   // 处理文件选择
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('handleFileChange 被调用');
+    console.log('event.target:', e.target);
+    console.log('event.target.files:', e.target.files);
+
     const file = e.target.files?.[0];
+    console.log('提取的文件:', file);
+
     if (file) {
+      console.log('准备 setSelectedFile');
       setSelectedFile(file);
       setParseError(null);
+      setRecognizeError(null);
+      setMappingInfo(null);
+      console.log('setSelectedFile 完成');
+    } else {
+      console.log('文件为空，不设置状态');
+    }
+  };
+
+  // 处理重新识别
+  const handleReidentify = async () => {
+    if (!selectedFile || !selectedSource) return;
+
+    setIsParsing(true);
+    setRecognizeError(null);
+
+    try {
+      // 强制重新识别
+      const parsedBills = await parseBillFile(selectedFile, selectedSource, {
+        forceReidentify: true,
+        onRecognizing: (recognizing) => {
+          setIsRecognizing(recognizing);
+        },
+      });
+
+      if (parsedBills.length === 0) {
+        setParseError("未找到有效的账单数据，请检查文件格式");
+        return;
+      }
+
+      // 自动分类
+      const categorizedBills = categorizeBills(parsedBills).map((bill) => ({
+        id: bill.id,
+        date: bill.transactionDate,
+        description: bill.description,
+        amount: bill.amount,
+        category: bill.category,
+        source: selectedSource,
+        originalData: bill.originalData,
+      }));
+
+      setBills(categorizedBills);
+      setStep("preview");
+    } catch (error) {
+      console.error("重新识别失败:", error);
+      setRecognizeError(`AI 识别失败: ${error instanceof Error ? error.message : "未知错误"}`);
+    } finally {
+      setIsParsing(false);
+      setIsRecognizing(false);
     }
   };
 
@@ -109,10 +169,15 @@ export default function NewBill() {
 
     setIsParsing(true);
     setParseError(null);
+    setRecognizeError(null);
 
     try {
-      // 解析文件
-      const parsedBills = await parseBillFile(selectedFile, selectedSource);
+      // 解析文件（使用 AI 智能识别）
+      const parsedBills = await parseBillFile(selectedFile, selectedSource, {
+        onRecognizing: (recognizing) => {
+          setIsRecognizing(recognizing);
+        },
+      });
 
       if (parsedBills.length === 0) {
         setParseError("未找到有效的账单数据，请检查文件格式");
@@ -135,9 +200,17 @@ export default function NewBill() {
       setStep("preview");
     } catch (error) {
       console.error("解析失败:", error);
-      setParseError(`文件解析失败: ${error instanceof Error ? error.message : "未知错误"}`);
+      const errorMessage = error instanceof Error ? error.message : "未知错误";
+
+      // 判断是否是 AI 识别错误
+      if (errorMessage.includes("AI") || errorMessage.includes("识别")) {
+        setRecognizeError(errorMessage);
+      } else {
+        setParseError(`文件解析失败: ${errorMessage}`);
+      }
     } finally {
       setIsParsing(false);
+      setIsRecognizing(false);
     }
   };
 
@@ -253,6 +326,61 @@ export default function NewBill() {
             </div>
           )}
 
+          {/* AI 识别状态 */}
+          {isRecognizing && (
+            <div className="mb-6 bg-purple-500/10 border border-purple-500/50 rounded-xl p-4 backdrop-blur-sm">
+              <div className="flex items-center gap-3">
+                <svg className="animate-spin h-5 w-5 text-purple-400" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                <span className="text-purple-300">
+                  🤖 正在使用 AI 智能识别列格式...
+                </span>
+              </div>
+            </div>
+          )}
+
+          {mappingInfo && !isRecognizing && (
+            <div className="mb-6 bg-green-500/10 border border-green-500/50 rounded-xl p-4 backdrop-blur-sm flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-green-300">
+                  ✨ AI 已识别列映射（置信度: {Math.round(mappingInfo.confidence * 100)}%）
+                </span>
+              </div>
+              <button
+                onClick={handleReidentify}
+                disabled={isParsing}
+                className="text-sm text-gray-400 hover:text-white flex items-center gap-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                重新识别
+              </button>
+            </div>
+          )}
+
+          {recognizeError && (
+            <div className="mb-6 bg-red-500/10 border border-red-500/50 rounded-xl p-4 backdrop-blur-sm">
+              <div className="flex items-start gap-3">
+                <svg className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <h3 className="text-red-400 font-semibold mb-1">AI 识别失败</h3>
+                  <p className="text-red-300 text-sm">{recognizeError}</p>
+                  <p className="text-red-300/70 text-xs mt-2">
+                    请稍后重试，或联系客服
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* 步骤 1: 上传表单 */}
           {step === "upload" && (
             <>
@@ -265,7 +393,10 @@ export default function NewBill() {
                     <select
                       id="source"
                       value={selectedSource}
-                      onChange={(e) => setSelectedSource(e.target.value)}
+                      onChange={(e) => {
+                        console.log('下拉菜单改变:', e.target.value);
+                        setSelectedSource(e.target.value);
+                      }}
                       className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
                     >
                       <option value="">请选择</option>
@@ -308,6 +439,35 @@ export default function NewBill() {
                   )}
 
                   <div className="flex gap-4">
+                    {/* 调试信息 */}
+                    <div className="w-full mb-4 p-4 bg-yellow-500/10 border border-yellow-500/50 rounded-xl">
+                      <p className="text-sm text-yellow-300 mb-2">
+                        <strong>调试信息：</strong><br/>
+                        文件: {selectedFile ? selectedFile.name : 'null'}<br/>
+                        来源: {selectedSource || 'null'}<br/>
+                        解析中: {isParsing ? '是' : '否'}<br/>
+                        按钮禁用: {!selectedFile || !selectedSource || isParsing ? '是' : '否'}
+                      </p>
+                      <button
+                        onClick={() => {
+                          console.log('测试按钮被点击');
+                          alert('React 事件处理器正常工作！');
+                        }}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm"
+                      >
+                        测试 React 事件
+                      </button>
+                      <button
+                        onClick={() => {
+                          console.log('手动设置状态');
+                          setSelectedFile(new File([''], 'test.csv'));
+                          setSelectedSource('wechat');
+                        }}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm"
+                      >
+                        手动设置状态
+                      </button>
+                    </div>
                     <button
                       onClick={handleParse}
                       disabled={!selectedFile || !selectedSource || isParsing}
