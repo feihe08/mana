@@ -82,22 +82,13 @@ export default function NewBill() {
 
   // 处理文件选择
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('handleFileChange 被调用');
-    console.log('event.target:', e.target);
-    console.log('event.target.files:', e.target.files);
-
     const file = e.target.files?.[0];
-    console.log('提取的文件:', file);
 
     if (file) {
-      console.log('准备 setSelectedFile');
       setSelectedFile(file);
       setParseError(null);
       setRecognizeError(null);
       setMappingInfo(null);
-      console.log('setSelectedFile 完成');
-    } else {
-      console.log('文件为空，不设置状态');
     }
   };
 
@@ -136,7 +127,6 @@ export default function NewBill() {
       setBills(categorizedBills);
       setStep("preview");
     } catch (error) {
-      console.error("重新识别失败:", error);
       setRecognizeError(`AI 识别失败: ${error instanceof Error ? error.message : "未知错误"}`);
     } finally {
       setIsParsing(false);
@@ -199,7 +189,6 @@ export default function NewBill() {
       setBills(categorizedBills);
       setStep("preview");
     } catch (error) {
-      console.error("解析失败:", error);
       const errorMessage = error instanceof Error ? error.message : "未知错误";
 
       // 判断是否是 AI 识别错误
@@ -262,7 +251,7 @@ export default function NewBill() {
       });
       // 成功后会刷新页面，actionData 会包含结果
     } catch (error) {
-      console.error("上传失败:", error);
+      // 静默处理错误，actionData 会包含错误信息
     }
   };
 
@@ -393,10 +382,7 @@ export default function NewBill() {
                     <select
                       id="source"
                       value={selectedSource}
-                      onChange={(e) => {
-                        console.log('下拉菜单改变:', e.target.value);
-                        setSelectedSource(e.target.value);
-                      }}
+                      onChange={(e) => setSelectedSource(e.target.value)}
                       className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
                     >
                       <option value="">请选择</option>
@@ -439,35 +425,6 @@ export default function NewBill() {
                   )}
 
                   <div className="flex gap-4">
-                    {/* 调试信息 */}
-                    <div className="w-full mb-4 p-4 bg-yellow-500/10 border border-yellow-500/50 rounded-xl">
-                      <p className="text-sm text-yellow-300 mb-2">
-                        <strong>调试信息：</strong><br/>
-                        文件: {selectedFile ? selectedFile.name : 'null'}<br/>
-                        来源: {selectedSource || 'null'}<br/>
-                        解析中: {isParsing ? '是' : '否'}<br/>
-                        按钮禁用: {!selectedFile || !selectedSource || isParsing ? '是' : '否'}
-                      </p>
-                      <button
-                        onClick={() => {
-                          console.log('测试按钮被点击');
-                          alert('React 事件处理器正常工作！');
-                        }}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm"
-                      >
-                        测试 React 事件
-                      </button>
-                      <button
-                        onClick={() => {
-                          console.log('手动设置状态');
-                          setSelectedFile(new File([''], 'test.csv'));
-                          setSelectedSource('wechat');
-                        }}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm"
-                      >
-                        手动设置状态
-                      </button>
-                    </div>
                     <button
                       onClick={handleParse}
                       disabled={!selectedFile || !selectedSource || isParsing}
