@@ -27,7 +27,7 @@ async function readFileAsText(file: File): Promise<string> {
   return await file.text();
 }
 
-export async function parseWechatCSV(file: File): Promise<ParsedBill[]> {
+export async function parseWeChatCSV(file: File): Promise<ParsedBill[]> {
   const text = await readFileAsText(file);
   const lines = text.split('\n').filter(line => line.trim());
 
@@ -71,7 +71,7 @@ export async function parseWechatCSV(file: File): Promise<ParsedBill[]> {
 
     const bill: ParsedBill = {
       id: `wechat-${Date.now()}-${i}`,
-      amount: Math.abs(amountValue),
+      amount: -Math.abs(amountValue), // 支出为负数
       description: description || counterparty || type || '',
       transactionDate: parseWechatDate(time || ''),
       originalData: {
@@ -87,7 +87,7 @@ export async function parseWechatCSV(file: File): Promise<ParsedBill[]> {
       },
     };
 
-    if (!isNaN(bill.amount) && bill.amount > 0) {
+    if (!isNaN(bill.amount) && bill.amount < 0) {
       bills.push(bill);
     }
   }

@@ -5,6 +5,7 @@
 
 import * as XLSX from "xlsx";
 import type { ParsedBill } from './csv';
+import { parseAlipayPaymentMethod } from './payment-method-parser';
 
 /**
  * 读取文件为文本（支持 CSV 和 Excel）
@@ -38,38 +39,52 @@ export async function parseAlipayCSV(file: File): Promise<ParsedBill[]> {
 
   for (let i = 1; i < lines.length; i++) {
     const cols = parseCSVLine(lines[i]);
-    if (cols.length < 4) continue;
+    if (cols.length < 9) continue; // 至少需要9列
 
+    // 支付宝账单列（2025格式）：
+    // 0:交易时间, 1:交易分类, 2:交易对方, 3:对方账号,
+    // 4:商品说明, 5:收/支, 6:金额, 7:收/付款方式, 8:交易状态
     const [
       time,
+      category,
+      counterparty,
+      counterpartyAccount,
       description,
       type,
-      counterparty,
       amount,
+      paymentMethod,
       status,
-      flow
+      ...rest
     ] = cols;
 
     // 只处理已成功的交易
     if (status && status.includes('成功') === false) continue;
 
     // 只处理支出
-    if (flow && flow.includes('支出') === false && type && type.includes('付款') === false) {
+    if (type && type.includes('支出') === false && type.includes('付款') === false) {
       continue;
     }
 
+    // 解析支付方式
+    const paymentMethodInfo = paymentMethod
+      ? parseAlipayPaymentMethod(paymentMethod)
+      : undefined;
+
     const bill: ParsedBill = {
       id: `alipay-${Date.now()}-${i}`,
-      amount: Math.abs(parseFloat(amount || '0')),
+      amount: -Math.abs(parseFloat(amount || '0')), // 支出为负数
       description: description || counterparty || '',
       transactionDate: parseAlipayDate(time || ''),
+      paymentMethodInfo,
       originalData: {
         source: 'alipay',
         time,
+        category,
+        counterparty,
         description,
         type,
-        counterparty,
         amount,
+        paymentMethod,
         status,
       },
     };

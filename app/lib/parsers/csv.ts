@@ -5,12 +5,16 @@
 
 import * as XLSX from "xlsx";
 
+import type { PaymentMethodInfo } from "./payment-method-parser";
+
 export interface ParsedBill {
   id: string;
   amount: number;
   description: string;
   transactionDate: string;
   originalData: Record<string, any>;
+  /** 支付方式信息（如果可提取） */
+  paymentMethodInfo?: PaymentMethodInfo;
 }
 
 /**

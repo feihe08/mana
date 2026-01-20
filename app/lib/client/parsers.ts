@@ -5,7 +5,7 @@
 
 import * as XLSX from "xlsx";
 import { parseAlipayCSV } from "../parsers/alipay";
-import { parseWechatCSV } from "../parsers/wechat";
+import { parseWeChatCSV } from "../parsers/wechat";
 import { parseCSV } from "../parsers/csv";
 import { parseBillWithAI } from "../parsers/smart-parser";
 import type { ParsedBill } from "../parsers/csv";
@@ -64,7 +64,7 @@ export async function parseBillFile(
       case "alipay":
         return await parseAlipayCSV(file);
       case "wechat":
-        return await parseWechatCSV(file);
+        return await parseWeChatCSV(file);
       case "bank":
       case "csv":
         return await parseCSV(file);
