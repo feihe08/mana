@@ -39,3 +39,6 @@ coverage
 
 # React Router
 .react-router
+
+# Claude Code
+.claude/
