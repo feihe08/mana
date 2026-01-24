@@ -1,104 +1,245 @@
+/**
+ * Mana 主页 - 账单转 Beancount 工具
+ * 三步骤流程：上传 → 预览 → 转换
+ */
+
+import { useState } from 'react';
+import { StepIndicator } from '../components/StepIndicator';
+import { Step1Upload } from '../components/steps/Step1Upload';
+import { Step2Preview } from '../components/steps/Step2Preview';
+import { Step3Result } from '../components/steps/Step3Result';
+import { parseBillFile } from '../lib/client/parsers';
+import { categorizeBills } from '../lib/client/parsers';
+import { detectAnomalies } from '../lib/client/anomaly';
+import { convertBillsToBeancount } from '../lib/pipeline/conversion-pipeline';
+import type { ParsedBill } from '../lib/parsers/csv';
+import type { ConversionResult } from '../lib/pipeline/conversion-pipeline';
+import type { Anomaly } from '../lib/client/anomaly';
+
+type BillSourceType = 'auto' | 'alipay' | 'wechat' | 'bank' | 'csv';
+
 export function meta() {
   return [
-    { title: "Mana - 智能账单分析" },
-    { name: "description", content: "自动分析您的支付宝、微信、银行卡账单" },
+    { title: 'Mana - 账单转 Beancount 工具' },
+    { name: 'description', content: '三步完成账单格式转换：上传支付宝/微信账单，预览调整，一键转换为 Beancount 格式' },
   ];
 }
 
-export default function Home() {
+export default function ConvertTool() {
+  // 步骤状态
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+
+  // 步骤 1 数据
+  const [files, setFiles] = useState<File[]>([]);
+  const [sourceType, setSourceType] = useState<BillSourceType>('auto');
+
+  // 步骤 2 数据
+  const [parsedBills, setParsedBills] = useState<ParsedBill[]>([]);
+  const [categorizedBills, setCategorizedBills] = useState<Array<ParsedBill & { category: string }>>([]);
+  const [selectedBillIds, setSelectedBillIds] = useState<Set<string>>(new Set());
+  const [deletedBillIds, setDeletedBillIds] = useState<Set<string>>(new Set());
+  const [anomalies, setAnomalies] = useState<Map<string, Anomaly>>(new Map());
+
+  // 步骤 3 数据
+  const [conversionResult, setConversionResult] = useState<ConversionResult | null>(null);
+
+  // 加载状态
+  const [isParsing, setIsParsing] = useState(false);
+  const [isConverting, setIsConverting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // 步骤定义
+  const steps = [
+    { id: 1, label: '上传文件' },
+    { id: 2, label: '预览调整' },
+    { id: 3, label: '转换下载' },
+  ];
+
+  // 步骤 1 → 2：解析文件
+  const handleParseFiles = async () => {
+    if (files.length === 0) {
+      setError('请先上传账单文件');
+      return;
+    }
+
+    setIsParsing(true);
+    setError(null);
+
+    try {
+      // 解析所有文件
+      const allBills = await Promise.all(
+        files.map((file) => parseBillFile(file, sourceType))
+      ).then((bills) => bills.flat());
+
+      setParsedBills(allBills);
+
+      // 自动分类
+      const categorized = categorizeBills(allBills);
+      setCategorizedBills(categorized);
+
+      // 异常检测
+      const detectedAnomalies = detectAnomalies(categorized);
+      setAnomalies(detectedAnomalies);
+
+      // 清空已删除的 ID（重新解析）
+      setDeletedBillIds(new Set());
+      setSelectedBillIds(new Set());
+
+      setCurrentStep(2);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '解析失败');
+    } finally {
+      setIsParsing(false);
+    }
+  };
+
+  // 步骤 2 → 3：转换
+  const handleConvert = async () => {
+    setIsConverting(true);
+    setError(null);
+
+    try {
+      // 过滤删除的账单
+      const filteredBills = categorizedBills.filter((b) => !deletedBillIds.has(b.id));
+
+      if (filteredBills.length === 0) {
+        setError('没有有效的账单可以转换');
+        return;
+      }
+
+      // 转换
+      const result = await convertBillsToBeancount(filteredBills, { sourceType });
+      setConversionResult(result);
+
+      setCurrentStep(3);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '转换失败');
+    } finally {
+      setIsConverting(false);
+    }
+  };
+
+  // 删除账单
+  const handleDeleteBills = (ids: string[]) => {
+    setDeletedBillIds((prev) => new Set([...prev, ...ids]));
+    setSelectedBillIds(new Set()); // 清空选择
+  };
+
+  // 切换选择状态
+  const handleToggleSelect = (id: string) => {
+    const newSelected = new Set(selectedBillIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedBillIds(newSelected);
+  };
+
+  // 全选/取消全选
+  const handleToggleSelectAll = () => {
+    const activeBills = categorizedBills.filter((b) => !deletedBillIds.has(b.id));
+    if (selectedBillIds.size === activeBills.length) {
+      setSelectedBillIds(new Set());
+    } else {
+      setSelectedBillIds(new Set(activeBills.map((b) => b.id)));
+    }
+  };
+
+  // 下载文件
+  const handleDownload = () => {
+    if (!conversionResult) return;
+
+    const blob = new Blob([conversionResult.beancountContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `beancount-${new Date().toISOString().split('T')[0]}.bean`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // 重新开始
+  const handleReset = () => {
+    setCurrentStep(1);
+    setFiles([]);
+    setParsedBills([]);
+    setCategorizedBills([]);
+    setSelectedBillIds(new Set());
+    setDeletedBillIds(new Set());
+    setAnomalies(new Map());
+    setConversionResult(null);
+    setError(null);
+  };
+
   return (
-    <div className="min-h-screen bg-gray-950 relative overflow-hidden">
+    <div className="min-h-screen bg-gray-950 relative">
       {/* 背景装饰 */}
       <div className="absolute inset-0 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950" />
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
 
-      <div className="relative container mx-auto px-4 py-16">
-        <div className="text-center">
-          {/* Logo / 标题 */}
-          <div className="mb-6">
-            <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-gray-800/50 border border-gray-700/50 backdrop-blur-sm">
-              <div className="w-2 h-2 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 animate-pulse" />
-              <span className="text-sm text-gray-300">智能财务分析</span>
-            </div>
+      <div className="relative container mx-auto px-4 py-8">
+        {/* 标题 */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-gray-800/50 border border-gray-700/50 backdrop-blur-sm mb-4">
+            <div className="w-2 h-2 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 animate-pulse" />
+            <span className="text-sm text-gray-300">账单转换工具</span>
           </div>
-
-          <h1 className="text-7xl font-bold text-white mb-6 tracking-tight">
-            Mana
-          </h1>
-          <p className="text-2xl text-gray-400 mb-6 font-light">
-            智能账单分析平台
-          </p>
-          <p className="text-lg text-gray-500 max-w-2xl mx-auto leading-relaxed">
-            自动分析您的支付宝、微信、银行卡账单，智能分类统计，异常检测提醒
-          </p>
+          <h1 className="text-5xl font-bold text-white mb-3 tracking-tight">Mana</h1>
+          <p className="text-lg text-gray-400">三步完成账单格式转换</p>
         </div>
 
-        {/* 功能卡片 */}
-        <div className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-          <div className="group relative bg-gray-900/50 border border-gray-800 rounded-2xl p-8 hover:border-purple-500/50 transition-all duration-300 backdrop-blur-sm">
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl" />
-            <div className="relative">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center mb-6 border border-purple-500/20">
-                <svg className="w-6 h-6 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-white mb-3">智能分类</h3>
-              <p className="text-gray-400 leading-relaxed">自动识别消费类别，精准统计收支</p>
+        {/* 错误提示 */}
+        {error && (
+          <div className="max-w-6xl mx-auto mb-6">
+            <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-4 text-red-400">
+              {error}
             </div>
           </div>
+        )}
 
-          <div className="group relative bg-gray-900/50 border border-gray-800 rounded-2xl p-8 hover:border-blue-500/50 transition-all duration-300 backdrop-blur-sm">
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl" />
-            <div className="relative">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 flex items-center justify-center mb-6 border border-blue-500/20">
-                <svg className="w-6 h-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-white mb-3">多格式支持</h3>
-              <p className="text-gray-400 leading-relaxed">支持支付宝、微信、银行账单导入</p>
-            </div>
-          </div>
-
-          <div className="group relative bg-gray-900/50 border border-gray-800 rounded-2xl p-8 hover:border-pink-500/50 transition-all duration-300 backdrop-blur-sm">
-            <div className="absolute inset-0 bg-gradient-to-br from-pink-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl" />
-            <div className="relative">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-500/20 to-rose-500/20 flex items-center justify-center mb-6 border border-pink-500/20">
-                <svg className="w-6 h-6 text-pink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-white mb-3">异常检测</h3>
-              <p className="text-gray-400 leading-relaxed">自动识别异常支出，预算超支提醒</p>
-            </div>
-          </div>
+        {/* 步骤导航 */}
+        <div className="max-w-6xl mx-auto mb-8">
+          <StepIndicator steps={steps} currentStep={currentStep} />
         </div>
 
-        {/* CTA 按钮 */}
-        <div className="mt-20 flex flex-col sm:flex-row gap-4 justify-center items-center">
-          <a
-            href="/convert/beancount"
-            className="group relative inline-flex items-center gap-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white px-8 py-4 rounded-xl text-lg font-semibold transition-all duration-300 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            转换为 Beancount
-          </a>
-          <a
-            href="/bills/new"
-            className="group relative inline-flex items-center gap-3 bg-gray-800 hover:bg-gray-700 text-white px-8 py-4 rounded-xl text-lg font-semibold transition-all duration-300 border border-gray-700"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-            账单数据分析
-            <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-            </svg>
-          </a>
+        {/* 步骤内容 */}
+        <div className="max-w-6xl mx-auto">
+          {currentStep === 1 && (
+            <Step1Upload
+              files={files}
+              sourceType={sourceType}
+              onFilesChange={setFiles}
+              onSourceTypeChange={setSourceType}
+              onNext={handleParseFiles}
+              isParsing={isParsing}
+            />
+          )}
+
+          {currentStep === 2 && (
+            <Step2Preview
+              bills={categorizedBills.filter((b) => !deletedBillIds.has(b.id))}
+              anomalies={anomalies}
+              selectedIds={selectedBillIds}
+              onToggleSelect={handleToggleSelect}
+              onToggleSelectAll={handleToggleSelectAll}
+              onDelete={handleDeleteBills}
+              onPrevious={() => setCurrentStep(1)}
+              onNext={handleConvert}
+              isConverting={isConverting}
+            />
+          )}
+
+          {currentStep === 3 && (
+            <Step3Result
+              result={conversionResult}
+              onDownload={handleDownload}
+              onRestart={handleReset}
+            />
+          )}
         </div>
       </div>
     </div>

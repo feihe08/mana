@@ -1,3 +1,4 @@
+import { redirect } from "react-router";
 import { useState, useCallback } from "react";
 import { convertBillsToBeancount, type ConversionOptions, type ConversionResult } from "../lib/pipeline/conversion-pipeline";
 
@@ -5,6 +6,11 @@ export function meta() {
   return [
     { title: "转换为 Beancount - Mana" },
   ];
+}
+
+export async function loader() {
+  // 重定向到首页
+  return redirect("/");
 }
 
 type BillSourceType = "auto" | "alipay" | "wechat" | "bank" | "csv";
