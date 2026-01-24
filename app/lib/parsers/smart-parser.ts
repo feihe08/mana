@@ -48,6 +48,10 @@ export async function parseBillWithAI(
 
     // 5. 使用映射解析数据
     return parseCSVWithMapping(csvText, mapping);
+  } catch (error) {
+    // AI API 调用失败，抛出错误让调用者降级到传统解析器
+    console.warn('AI 解析失败，将降级到传统解析器:', error);
+    throw error;
   } finally {
     options.onRecognizing?.(false);
   }

@@ -67,6 +67,8 @@ export async function parseBillFile(
         return await parseWeChatCSV(file);
       case "bank":
       case "csv":
+      case "auto":
+        // auto 模式下，尝试通用 CSV 解析器
         return await parseCSV(file);
       default:
         throw new Error(`不支持的账单来源: ${source}`);
