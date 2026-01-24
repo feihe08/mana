@@ -4,6 +4,7 @@
  */
 
 import { useState } from 'react';
+import { Link } from 'react-router';
 import { StepIndicator } from '../components/StepIndicator';
 import { Step1Upload } from '../components/steps/Step1Upload';
 import { Step2Preview } from '../components/steps/Step2Preview';
@@ -12,6 +13,7 @@ import { parseBillFile } from '../lib/client/parsers';
 import { categorizeBills } from '../lib/client/parsers';
 import { detectAnomalies } from '../lib/client/anomaly';
 import { convertBillsToBeancount } from '../lib/pipeline/conversion-pipeline';
+import { saveBills, getBillsHistory } from '../lib/client/storage';
 import type { ParsedBill } from '../lib/parsers/csv';
 import type { ConversionResult } from '../lib/pipeline/conversion-pipeline';
 import type { Anomaly } from '../lib/client/anomaly';
@@ -108,6 +110,13 @@ export default function ConvertTool() {
       const result = await convertBillsToBeancount(filteredBills, { sourceType: 'auto' });
       setConversionResult(result);
 
+      // 保存到本地存储
+      const fileName = files.length > 0
+        ? files[0].name.replace(/\.[^/.]+$/, '')
+        : `账单-${new Date().toISOString().split('T')[0]}`;
+
+      saveBills(fileName, filteredBills, result.beancountContent);
+
       setCurrentStep(3);
     } catch (err) {
       setError(err instanceof Error ? err.message : '转换失败');
@@ -181,6 +190,14 @@ export default function ConvertTool() {
       <div className="relative container mx-auto px-4 py-8">
         {/* 标题 */}
         <div className="text-center mb-8">
+          <div className="flex justify-center items-center gap-4 mb-4">
+            <Link
+              to="/bills"
+              className="text-purple-400 hover:text-purple-300 text-sm flex items-center gap-2"
+            >
+              📊 查看账单历史
+            </Link>
+          </div>
           <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-gray-800/50 border border-gray-700/50 backdrop-blur-sm mb-4">
             <div className="w-2 h-2 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 animate-pulse" />
             <span className="text-sm text-gray-300">账单转换工具</span>
