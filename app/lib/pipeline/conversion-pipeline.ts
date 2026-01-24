@@ -99,36 +99,67 @@ async function parseBillByType(
 
 /**
  * 账单转换主函数
+ * 支持两种输入：File[]（会先解析）或 ParsedBill[]（直接使用）
  */
 export async function convertBillsToBeancount(
-  files: File | File[],
+  input: File | File[] | ParsedBill[],
   options: ConversionOptions = {}
 ): Promise<ConversionResult> {
-  // 规范化输入
-  const fileArray = Array.isArray(files) ? files : [files];
   const warnings: string[] = [];
   const sources: string[] = [];
   const accountsUsed = new Set<string>();
 
-  // 1. 解析所有账单文件
-  const allBills: ParsedBill[] = [];
-  for (const file of fileArray) {
-    try {
-      const bills = await parseBillByType(file, options.sourceType || 'auto');
-      allBills.push(...bills);
-      sources.push(identifyBillType(file.name));
+  // 检测输入类型并获取账单数据
+  let allBills: ParsedBill[] = [];
 
-      // 收集支付方式账户
-      bills.forEach(bill => {
-        if (bill.paymentMethodInfo?.beancountAccount) {
-          accountsUsed.add(bill.paymentMethodInfo.beancountAccount);
-        }
-      });
-    } catch (error) {
-      warnings.push(
-        `解析文件 ${file.name} 失败: ${error instanceof Error ? error.message : '未知错误'}`
-      );
+  // 规范化输入为数组
+  const inputArray = Array.isArray(input) ? input : [input];
+
+  // 判断是否为 File 对象（检查第一个元素是否有 File 特有的属性）
+  const isFirstArgFile = inputArray.length > 0 && (
+    inputArray[0] instanceof File ||
+    (typeof File !== 'undefined' && inputArray[0] instanceof File) ||
+    // 检查 File 对象的特征属性
+    ('name' in inputArray[0] && 'lastModified' in inputArray[0] &&
+     'size' in inputArray[0] && 'type' in inputArray[0])
+  );
+
+  if (isFirstArgFile) {
+    // 输入是 File[]，需要先解析
+    const fileArray = inputArray as File[];
+
+    for (const file of fileArray) {
+      try {
+        const bills = await parseBillByType(file, options.sourceType || 'auto');
+        allBills.push(...bills);
+        sources.push(identifyBillType(file.name));
+
+        // 收集支付方式账户
+        bills.forEach(bill => {
+          if (bill.paymentMethodInfo?.beancountAccount) {
+            accountsUsed.add(bill.paymentMethodInfo.beancountAccount);
+          }
+        });
+      } catch (error) {
+        warnings.push(
+          `解析文件 ${file.name} 失败: ${error instanceof Error ? error.message : '未知错误'}`
+        );
+      }
     }
+  } else {
+    // 输入是 ParsedBill[]，直接使用
+    allBills = inputArray as ParsedBill[];
+
+    // 收集来源和账户信息（从 originalData 中提取）
+    allBills.forEach(bill => {
+      const source = bill.originalData?.source as string | undefined;
+      if (source) {
+        sources.push(source);
+      }
+      if (bill.paymentMethodInfo?.beancountAccount) {
+        accountsUsed.add(bill.paymentMethodInfo.beancountAccount);
+      }
+    });
   }
 
   if (allBills.length === 0) {
@@ -138,7 +169,7 @@ export async function convertBillsToBeancount(
       transactionCount: 0,
       sources: [],
       accountsUsed: [],
-      warnings: ['未解析到任何交易记录'],
+      warnings: warnings.length > 0 ? warnings : ['未解析到任何交易记录'],
     };
   }
 

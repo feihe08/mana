@@ -13,11 +13,8 @@ export async function loader() {
   return redirect("/");
 }
 
-type BillSourceType = "auto" | "alipay" | "wechat" | "bank" | "csv";
-
 export default function ConvertToBeancount() {
   const [files, setFiles] = useState<File[]>([]);
-  const [sourceType, setSourceType] = useState<BillSourceType>("auto");
   const [includeOpenDirectives, setIncludeOpenDirectives] = useState(true);
   const [isConverting, setIsConverting] = useState(false);
   const [result, setResult] = useState<ConversionResult | null>(null);
@@ -64,7 +61,7 @@ export default function ConvertToBeancount() {
 
     try {
       const options: ConversionOptions = {
-        sourceType,
+        sourceType: 'auto',
         includeOpenDirectives,
       };
 
@@ -223,27 +220,6 @@ export default function ConvertToBeancount() {
                 转换选项
               </h2>
 
-              {/* Source Type Selection */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  账单类型
-                </label>
-                <select
-                  value={sourceType}
-                  onChange={(e) => setSourceType(e.target.value as BillSourceType)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all"
-                >
-                  <option value="auto">自动识别</option>
-                  <option value="alipay">支付宝账单</option>
-                  <option value="wechat">微信账单</option>
-                  <option value="bank">银行卡账单</option>
-                  <option value="csv">通用 CSV</option>
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  选择"自动识别"时，将根据文件名判断类型
-                </p>
-              </div>
-
               {/* Include Open Directives */}
               <div className="mb-6">
                 <label className="flex items-center gap-3 cursor-pointer">
@@ -264,6 +240,12 @@ export default function ConvertToBeancount() {
               <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
                 <h3 className="text-sm font-medium text-white mb-2">转换说明</h3>
                 <ul className="text-xs text-gray-400 space-y-1.5">
+                  <li className="flex items-start gap-2">
+                    <svg className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    自动识别账单类型（支付宝/微信/CSV）
+                  </li>
                   <li className="flex items-start gap-2">
                     <svg className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />

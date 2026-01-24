@@ -89,8 +89,10 @@ async function extractHeaders(file: File): Promise<{ headers: string[]; csvText:
     throw new Error('未找到表头行');
   }
 
-  // CSV 文件
-  const csvText = await file.text();
+  // CSV 文件 - 使用 GB18030 编码（中文 CSV 文件常用编码）
+  const buffer = await file.arrayBuffer();
+  const decoder = new TextDecoder('gb18030');
+  const csvText = decoder.decode(buffer);
   const lines = csvText.split('\n').filter(line => line.trim());
 
   // 对 CSV 也使用相同的逻辑（跳过说明行）
@@ -140,6 +142,8 @@ function parseCSVLine(line: string): string[] {
  * 使用列映射解析 CSV 数据
  */
 function parseCSVWithMapping(csvText: string, mapping: ColumnMapping): ParsedBill[] {
+  console.log('🔍 [parseCSVWithMapping] AI 识别的列映射:', mapping);
+
   const lines = csvText.split('\n').filter(line => line.trim());
   const bills: ParsedBill[] = [];
 
@@ -154,6 +158,8 @@ function parseCSVWithMapping(csvText: string, mapping: ColumnMapping): ParsedBil
       break;
     }
   }
+
+  console.log(`📊 [parseCSVWithMapping] 找到 ${lines.length} 行，数据从第 ${dataStartIndex} 行开始`);
 
   // 解析数据行
   for (let i = dataStartIndex; i < lines.length; i++) {
@@ -171,13 +177,14 @@ function parseCSVWithMapping(csvText: string, mapping: ColumnMapping): ParsedBil
 
     // 清理金额（移除货币符号和逗号）
     const amount = parseFloat(amountStr.replace(/[¥$€£￥,，\s]/g, ''));
-    if (isNaN(amount) || amount <= 0) {
-      continue; // 跳过无效金额
+    if (isNaN(amount) || amount === 0) {
+      continue; // 跳过无效金额（允许正数和负数）
     }
 
     // 过滤：只处理支出（如果有方向列）
     if (mapping.direction !== undefined && mapping.direction >= 0) {
       const isExpense = direction.includes('支') ||
+                        direction.includes('出') ||
                         direction.toLowerCase().includes('out') ||
                         direction.toLowerCase() === '支出';
 
@@ -186,9 +193,12 @@ function parseCSVWithMapping(csvText: string, mapping: ColumnMapping): ParsedBil
       }
     }
 
+    // 支出转为负数
+    const finalAmount = -Math.abs(amount);
+
     bills.push({
       id: `bill-${Date.now()}-${i}`,
-      amount,
+      amount: finalAmount,
       description: description || counterparty || '未知交易',
       transactionDate: parseDate(time),
       originalData: {
@@ -201,6 +211,8 @@ function parseCSVWithMapping(csvText: string, mapping: ColumnMapping): ParsedBil
       },
     });
   }
+
+  console.log(`✅ [parseCSVWithMapping] 解析完成，共 ${bills.length} 条记录`);
 
   return bills;
 }

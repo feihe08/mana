@@ -9,14 +9,11 @@ export type {
   Amount,
   Posting,
   Transaction,
-  Balance,
-  Open,
-  Close,
-  Price,
   Directive,
   AccountMappingConfig,
   CategoryRule,
   ParsedBill,
+  PaymentMethodInfo,
   GenerateOptions,
 } from "./types";
 

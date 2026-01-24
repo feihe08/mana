@@ -147,6 +147,129 @@ mana/
 
 ---
 
+## 🏷️ 分类体系
+
+Mana 使用统一的 **15 个标准分类**，所有账单分类（规则分类 + AI 分类）都必须落在这个分类体系内。
+
+### 分类定义文件
+
+**位置**: `app/lib/beancount/category-taxonomy.ts`
+
+这是分类体系的**单一数据源**，定义了：
+- 15 个标准分类的类型和列表
+- 分类显示名称映射（用于前端展示）
+- 分类描述（用于 AI 提示词）
+- Beancount 账户与标准分类的双向映射
+
+### 15 个标准分类
+
+#### 支出类（13个）
+
+| 主分类 | 子分类 | 标准分类代码 | 说明 | 示例 |
+|--------|--------|--------------|------|------|
+| **餐饮** | 外卖 | `Food-Delivery` | 外卖配送 | 美团、饿了么、汉堡王外卖 |
+| | 餐厅 | `Food-Restaurant` | 餐厅用餐 | 小笼包、牛肉面、罗妈砂锅 |
+| | 生鲜食品 | `Food-Groceries` | 生鲜食品 | 菜鲜果美、超市、菜市场 |
+| **交通** | 打车 | `Transport-Taxi` | 打车出行 | 滴滴、网约车、出租车 |
+| | 公共交通 | `Transport-Public` | 公共交通 | 地铁、公交、一卡通 |
+| **购物** | 网购 | `Shopping-Online` | 网购 | 京东、淘宝、拼多多 |
+| | 日用品 | `Shopping-Daily` | 日用品 | 名创优品、便利店、百货 |
+| **医疗健康** | 医疗 | `Health-Medical` | 医疗 | 医院、体检、药品、医保 |
+| | 保健 | `Health-Wellness` | 保健 | 按摩、修脚、健身、美容 |
+| **居住** | 水电燃气 | `Housing-Utilities` | 水电燃气 | 水费、电费、燃气、桶装水、充电 |
+| | 网络通讯 | `Housing-Internet` | 网络通讯 | 宽带、话费、充值 |
+| **教育** | 教育 | `Education-Learning` | 教育 | 培训、课程、书籍、学校 |
+| **其他** | 服务费用 | `Misc-Fees` | 服务费用 | 手续费、代理费、服务费 |
+| | 公益捐赠 | `Misc-Charity` | 公益捐赠 | 慈善捐款、公益组织 |
+
+#### 收入类（2个）
+
+| 主分类 | 标准分类代码 | 说明 | 示例 |
+|--------|--------------|------|------|
+| **收入** | `Income-Salary` | 工资收入 | 工资、奖金、薪资 |
+| | `Income-Refunds` | 退款/转账 | 退款、转账收入 |
+
+### 分类映射
+
+#### 标准分类 → Beancount 账户
+```
+Food-Delivery → Expenses:Food:Delivery
+Food-Restaurant → Expenses:Food:Restaurant
+...
+Shopping-Daily → Expenses:Shopping:Daily
+Income-Salary → Income:Salary
+```
+
+#### 标准分类 → 显示名称
+```
+Food-Delivery → "外卖"
+Food-Restaurant → "餐厅"
+Shopping-Online → "网购"
+```
+
+### 分类维护规范
+
+1. **添加新分类**
+   - 在 `category-taxonomy.ts` 中添加新的 `StandardCategory` 类型
+   - 更新 `STANDARD_CATEGORIES`、`CATEGORY_DISPLAY_NAMES`、`CATEGORY_DESCRIPTIONS`
+   - 更新 `BEANCOUNT_TO_CATEGORY` 和 `CATEGORY_TO_BEANCOUNT` 映射
+   - 同步更新 `default-accounts.ts` 中的分类规则
+   - 同步更新 `workers/app.ts` 中的 AI 提示词
+
+2. **修改分类规则**
+   - 在 `default-accounts.ts` 中修改 `categoryRules`
+   - 确保规则的 `account` 字段映射到标准分类
+
+3. **AI 分类约束**
+   - AI 提示词硬编码 15 个标准分类
+   - AI 返回的分类必须是标准分类之一
+   - `parsers.ts` 验证 AI 返回值，非标准分类自动映射到 `Shopping-Daily`（兜底）
+
+### 分类策略
+
+Mana 使用**三层分类策略**：
+
+1. **第一层：原始分类**
+   - 优先使用账单自带的分类（如支付宝的"餐饮美食"）
+   - 映射到标准分类
+
+2. **第二层：规则匹配**
+   - 13 条核心规则，覆盖常见场景
+   - 基于关键词正则匹配
+   - 映射到标准分类
+
+3. **第三层：AI Fallback**
+   - 批量调用 AI API
+   - AI 从 15 个标准分类中选择
+   - 失败时使用 `Shopping-Daily` 兜底
+
+### 代码示例
+
+```typescript
+import {
+  beancountToCategory,
+  getCategoryDisplayName,
+  isValidCategory,
+  STANDARD_CATEGORIES,
+  type StandardCategory,
+} from "../beancount/category-taxonomy";
+
+// 验证分类
+if (isValidCategory("Food-Delivery")) {
+  const displayName = getCategoryDisplayName("Food-Delivery");
+  console.log(displayName); // "外卖"
+}
+
+// Beancount 账户 → 标准分类
+const category = beancountToCategory("Expenses:Food:Delivery");
+console.log(category); // "Food-Delivery"
+
+// 获取所有标准分类
+console.log(STANDARD_CATEGORIES.length); // 15
+```
+
+---
+
 ## 🎯 核心概念
 
 ### React Router v7 特性

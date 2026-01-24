@@ -4,22 +4,16 @@
 
 import React, { useCallback } from 'react';
 
-type BillSourceType = 'auto' | 'alipay' | 'wechat' | 'bank' | 'csv';
-
 interface Step1UploadProps {
   files: File[];
-  sourceType: BillSourceType;
   onFilesChange: (files: File[]) => void;
-  onSourceTypeChange: (type: BillSourceType) => void;
   onNext: () => void;
   isParsing?: boolean;
 }
 
 export function Step1Upload({
   files,
-  sourceType,
   onFilesChange,
-  onSourceTypeChange,
   onNext,
   isParsing = false,
 }: Step1UploadProps) {
@@ -57,25 +51,8 @@ export function Step1Upload({
     <div className="space-y-8">
       {/* 上传区域 */}
       <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-8">
-        <h2 className="text-2xl font-bold text-white mb-6">上传账单文件</h2>
-
-        {/* 账单来源选择 */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            账单来源
-          </label>
-          <select
-            value={sourceType}
-            onChange={(e) => onSourceTypeChange(e.target.value as BillSourceType)}
-            className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-          >
-            <option value="auto">自动识别</option>
-            <option value="alipay">支付宝</option>
-            <option value="wechat">微信支付</option>
-            <option value="bank">银行卡</option>
-            <option value="csv">通用 CSV</option>
-          </select>
-        </div>
+        <h2 className="text-2xl font-bold text-white mb-2">上传账单文件</h2>
+        <p className="text-gray-400 mb-6">支持支付宝、微信支付账单（CSV/Excel格式），自动识别类型</p>
 
         {/* 拖拽上传区域 */}
         <div

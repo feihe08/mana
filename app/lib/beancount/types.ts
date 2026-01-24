@@ -95,6 +95,22 @@ export interface CategoryRule {
 }
 
 /**
+ * 支付方式信息
+ */
+export interface PaymentMethodInfo {
+  /** 银行/支付平台名称 */
+  bankName: string;
+  /** 支付类型（信用卡/储蓄卡/余额等） */
+  paymentType: string;
+  /** 卡号后四位 */
+  lastFourDigits?: string;
+  /** 完整的支付方式描述 */
+  fullDescription: string;
+  /** 标准化的 Beancount 账户名 */
+  beancountAccount: string;
+}
+
+/**
  * 解析后的账单数据（来自现有 Parser）
  */
 export interface ParsedBill {
@@ -103,8 +119,12 @@ export interface ParsedBill {
   description: string;
   transactionDate: string;
   originalData: Record<string, any>;
-  source?: string;  // 数据来源（wechat, alipay, bank, csv）
-  category?: string; // 已分类的类别
+  /** 数据来源（wechat, alipay, bank, csv） */
+  source?: string;
+  /** 已分类的类别 */
+  category?: string;
+  /** 支付方式信息（如果可提取） */
+  paymentMethodInfo?: PaymentMethodInfo;
 }
 
 /**
@@ -123,4 +143,7 @@ export interface GenerateOptions {
 
   /** 自定义账户映射配置 */
   accountMapping?: Partial<AccountMappingConfig>;
+
+  /** 货币代码（默认 CNY） */
+  currency?: string;
 }

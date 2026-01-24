@@ -21,9 +21,20 @@ import { COMMON_ACCOUNTS } from "./default-accounts";
  */
 export class BeancountGenerator {
   private options: GenerateOptions;
+  private mapper: AccountMapper;
 
-  constructor(options?: GenerateOptions) {
-    this.options = options || {};
+  constructor(mapper?: AccountMapper, options?: GenerateOptions);
+  constructor(options?: GenerateOptions);
+  constructor(mapperOrOptions?: AccountMapper | GenerateOptions, options?: GenerateOptions) {
+    // 重载：如果第一个参数是 AccountMapper
+    if (mapperOrOptions && 'getAssetAccount' in mapperOrOptions) {
+      this.mapper = mapperOrOptions as AccountMapper;
+      this.options = options || {};
+    } else {
+      // 如果第一个参数是 GenerateOptions 或未提供
+      this.mapper = new AccountMapper();
+      this.options = mapperOrOptions || {};
+    }
   }
 
   /**
@@ -89,17 +100,16 @@ export class BeancountGenerator {
    * 将账单转换为交易
    */
   private billToTransaction(bill: ParsedBill): Transaction {
-    const mapper = new AccountMapper(this.options.accountMapping);
-
     // 判断是支出还是收入
     const isExpense = bill.amount < 0;
     const absoluteAmount = Math.abs(bill.amount);
+    const currency = this.options.currency || "CNY";
 
     // 获取账户
     // 优先使用支付方式信息中的账户，否则使用 source 映射的默认账户
     const assetAccount = bill.paymentMethodInfo?.beancountAccount
-      || mapper.getAssetAccount(bill.source);
-    const categoryAccount = mapper.getCategoryAccount(
+      || this.mapper.getAssetAccount(bill.source);
+    const categoryAccount = this.mapper.getCategoryAccount(
       bill.description,
       bill.amount
     );
@@ -116,21 +126,21 @@ export class BeancountGenerator {
       // 支出：费用账户借方（正数），资产账户贷方（负数）
       postings.push({
         account: categoryAccount,
-        amount: { number: absoluteAmount, currency: "CNY" },
+        amount: { number: absoluteAmount, currency },
       });
       postings.push({
         account: assetAccount,
-        amount: { number: -absoluteAmount, currency: "CNY" },
+        amount: { number: -absoluteAmount, currency },
       });
     } else {
       // 收入：资产账户借方（正数），收入账户贷方（负数）
       postings.push({
         account: assetAccount,
-        amount: { number: absoluteAmount, currency: "CNY" },
+        amount: { number: absoluteAmount, currency },
       });
       postings.push({
         account: categoryAccount,
-        amount: { number: -absoluteAmount, currency: "CNY" },
+        amount: { number: -absoluteAmount, currency },
       });
     }
 

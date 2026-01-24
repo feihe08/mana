@@ -24,20 +24,46 @@ async function readFileAsText(file: File): Promise<string> {
     return XLSX.utils.sheet_to_csv(worksheet);
   }
 
-  // CSV 文件直接读取
-  return await file.text();
+  // CSV 文件 - 支付宝使用 GB18030 编码
+  const buffer = await file.arrayBuffer();
+  const decoder = new TextDecoder('gb18030');
+  return decoder.decode(buffer);
 }
 
 export async function parseAlipayCSV(file: File): Promise<ParsedBill[]> {
+  console.log('🔵 [parseAlipayCSV] 开始解析支付宝账单:', file.name);
+
   const text = await readFileAsText(file);
   const lines = text.split('\n').filter(line => line.trim());
+
+  console.log('📊 [parseAlipayCSV] 文件总行数:', lines.length);
+  console.log('🔍 [parseAlipayCSV] 前5行内容:', lines.slice(0, 5));
+
+  // 找到表头行
+  let headerIndex = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].includes('交易时间') && lines[i].includes('交易分类') && lines[i].includes('收/支')) {
+      headerIndex = i;
+      break;
+    }
+  }
+
+  console.log('📍 [parseAlipayCSV] 表头行索引:', headerIndex);
+  if (headerIndex >= 0) {
+    console.log('📋 [parseAlipayCSV] 表头内容:', lines[headerIndex]);
+  }
+
+  if (headerIndex === -1) {
+    console.error('❌ [parseAlipayCSV] 未找到表头行');
+    throw new Error('未找到表头行，请确认这是有效的支付宝账单文件');
+  }
 
   // 支付宝账单格式：
   // 付款时间,商品说明,收/付款,对方户名,金额,交易状态,资金流向...
   // 跳过标题行和可能的空行
   const bills: ParsedBill[] = [];
 
-  for (let i = 1; i < lines.length; i++) {
+  for (let i = headerIndex + 1; i < lines.length; i++) {
     const cols = parseCSVLine(lines[i]);
     if (cols.length < 9) continue; // 至少需要9列
 
@@ -93,6 +119,8 @@ export async function parseAlipayCSV(file: File): Promise<ParsedBill[]> {
       bills.push(bill);
     }
   }
+
+  console.log('✅ [parseAlipayCSV] 解析完成，共', bills.length, '条支出记录');
 
   return bills;
 }

@@ -8,6 +8,13 @@ import { parseAlipayCSV } from "../parsers/alipay";
 import { parseWeChatCSV } from "../parsers/wechat";
 import { parseCSV } from "../parsers/csv";
 import { parseBillWithAI } from "../parsers/smart-parser";
+import { getCategoryRules } from "../beancount/default-accounts";
+import {
+  beancountToCategory,
+  getCategoryDisplayName,
+  isValidCategory,
+  type StandardCategory,
+} from "../beancount/category-taxonomy";
 import type { ParsedBill } from "../parsers/csv";
 
 export type { ParsedBill };
@@ -50,111 +57,260 @@ export async function parseBillFile(
   source: string,
   options?: SmartParseOptions
 ): Promise<ParsedBill[]> {
+  console.log('🔍 [parseBillFile] 开始解析文件:', {
+    fileName: file.name,
+    fileSize: file.size,
+    source,
+    fileType: file.type
+  });
+
   try {
     // 使用智能解析器（AI + 缓存）
-    return await parseBillWithAI(file, source, {
+    console.log('🤖 [parseBillFile] 尝试使用 AI 解析器...');
+    const result = await parseBillWithAI(file, source, {
       forceReidentify: options?.forceReidentify,
       onRecognizing: options?.onRecognizing,
     });
+    console.log('✅ [parseBillFile] AI 解析成功，返回', result.length, '条记录');
+    return result;
   } catch (error) {
     // 如果 AI 解析失败，降级到传统解析器
-    console.warn('AI 解析失败，使用传统解析器:', error);
+    console.warn('⚠️ [parseBillFile] AI 解析失败，使用传统解析器:', error);
+    console.log('📋 [parseBillFile] 降级到传统解析器，source =', source);
 
-    switch (source) {
-      case "alipay":
-        return await parseAlipayCSV(file);
-      case "wechat":
-        return await parseWeChatCSV(file);
-      case "bank":
-      case "csv":
-      case "auto":
-        // auto 模式下，尝试通用 CSV 解析器
-        return await parseCSV(file);
-      default:
-        throw new Error(`不支持的账单来源: ${source}`);
-    }
-  }
-}
-
-/**
- * 默认分类规则（从数据库 schema 复制）
- * 在客户端预览时使用
- */
-export const DEFAULT_CATEGORIES: Array<{
-  id: string;
-  name: string;
-  keywords: string[];
-}> = [
-  {
-    id: "cat-food",
-    name: "餐饮",
-    keywords: ["餐饮", "美食", "外卖", "饭", "面", "菜"],
-  },
-  {
-    id: "cat-transport",
-    name: "交通",
-    keywords: ["交通", "打车", "地铁", "公交", "加油", "停车"],
-  },
-  {
-    id: "cat-shopping",
-    name: "购物",
-    keywords: ["购物", "淘宝", "京东", "超市", "便利店"],
-  },
-  {
-    id: "cat-entertainment",
-    name: "娱乐",
-    keywords: ["娱乐", "电影", "游戏", "KTV", "健身"],
-  },
-  {
-    id: "cat-housing",
-    name: "居住",
-    keywords: ["房租", "水电", "燃气", "物业", "宽带"],
-  },
-  {
-    id: "cat-uncategorized",
-    name: "未分类",
-    keywords: [],
-  },
-];
-
-/**
- * 客户端智能分类
- * 基于关键词匹配
- */
-export function categorizeBill(description: string, categories: typeof DEFAULT_CATEGORIES): string {
-  let bestMatch = "未分类";
-  let maxScore = 0;
-
-  const normalizedDesc = description.toLowerCase();
-
-  for (const category of categories) {
-    let score = 0;
-
-    // 检查关键词匹配
-    for (const keyword of category.keywords) {
-      if (normalizedDesc.includes(keyword.toLowerCase())) {
-        score += 1;
+    // 如果是 auto，先根据文件名识别类型
+    let actualSource = source;
+    if (source === 'auto') {
+      const fileName = file.name.toLowerCase();
+      if (fileName.includes('支付宝') || fileName.includes('alipay')) {
+        actualSource = 'alipay';
+        console.log('🔍 [parseBillFile] 文件名识别为支付宝账单');
+      } else if (fileName.includes('微信') || fileName.includes('wechat')) {
+        actualSource = 'wechat';
+        console.log('🔍 [parseBillFile] 文件名识别为微信账单');
+      } else {
+        actualSource = 'csv';
+        console.log('🔍 [parseBillFile] 文件名识别为通用 CSV');
       }
     }
 
-    if (score > maxScore) {
-      maxScore = score;
-      bestMatch = category.name;
+    console.log('📋 [parseBillFile] 实际使用的解析器:', actualSource);
+
+    let result: ParsedBill[] = [];
+
+    switch (actualSource) {
+      case "alipay":
+        console.log('🔵 [parseBillFile] 使用支付宝解析器...');
+        result = await parseAlipayCSV(file);
+        console.log('✅ [parseBillFile] 支付宝解析器返回', result.length, '条记录');
+        return result;
+      case "wechat":
+        console.log('💬 [parseBillFile] 使用微信解析器...');
+        result = await parseWeChatCSV(file);
+        console.log('✅ [parseBillFile] 微信解析器返回', result.length, '条记录');
+        return result;
+      case "bank":
+      case "csv":
+      default:
+        console.log('📄 [parseBillFile] 使用通用 CSV 解析器...');
+        result = await parseCSV(file);
+        console.log('✅ [parseBillFile] 通用 CSV 解析器返回', result.length, '条记录');
+        return result;
     }
   }
-
-  return bestMatch;
 }
 
 /**
- * 批量分类账单
+ * 使用 AI 进行批量分类（fallback）
  */
-export function categorizeBills(
-  bills: ParsedBill[],
-  categories: typeof DEFAULT_CATEGORIES = DEFAULT_CATEGORIES
-): Array<ParsedBill & { category: string }> {
-  return bills.map((bill) => ({
-    ...bill,
-    category: categorizeBill(bill.description, categories),
-  }));
+async function categorizeByAI(
+  bills: Array<{ description: string; amount: number }>
+): Promise<Map<string, string>> {
+  console.log('🤖 [categorizeByAI] 使用 AI 分类', bills.length, '条未分类账单');
+
+  // 批量调用 AI API
+  const request = await fetch('/api/batch-categorize', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bills }),
+  });
+
+  if (!request.ok) {
+    console.error('❌ [categorizeByAI] AI 请求失败:', request.statusText);
+    return new Map();
+  }
+
+  const result = await request.json();
+  const categoryMap = new Map<string, string>();
+
+  result.categories.forEach((item: { description: string; account: string }) => {
+    categoryMap.set(item.description, item.account);
+  });
+
+  console.log('✅ [categorizeByAI] AI 分类完成');
+  return categoryMap;
+}
+
+/**
+ * 单条账单分类（三层策略）
+ */
+async function categorizeSingleBill(
+  bill: ParsedBill,
+  aiCategoryCache: Map<string, string>
+): Promise<{ category: string; source: string }> {
+  const description = bill.description;
+
+  // 第一层：优先使用原始账单的分类
+  if (bill.originalData?.category) {
+    const originalCategory = bill.originalData.category as string;
+    if (originalCategory && originalCategory.trim() !== '') {
+      console.log('📋 [categorizeBill] 使用原始分类:', originalCategory);
+      return { category: originalCategory, source: 'original' };
+    }
+  }
+
+  // 第二层：规则匹配
+  const rules = getCategoryRules();
+  const sortedRules = [...rules].sort((a, b) => (b.priority || 0) - (a.priority || 0));
+
+  for (const rule of sortedRules) {
+    // 跳过默认规则（priority: 0）
+    if (rule.priority === 0) continue;
+
+    const pattern = rule.pattern instanceof RegExp
+      ? rule.pattern
+      : new RegExp(rule.pattern, 'i');
+
+    if (pattern.test(description)) {
+      const categoryParts = rule.account.split(':');
+      const mainCategory = categoryParts[1] || 'Uncategorized';
+      const subCategory = categoryParts[2] || '';
+      const categoryDisplayName = subCategory ? `${mainCategory}-${subCategory}` : mainCategory;
+
+      console.log('✅ [categorizeBill] 规则匹配:', rule.account, '→', categoryDisplayName);
+      return { category: categoryDisplayName, source: 'rule' };
+    }
+  }
+
+  // 第三层：AI Fallback
+  if (aiCategoryCache.has(description)) {
+    const aiCategory = aiCategoryCache.get(description)!;
+    const categoryParts = aiCategory.split(':');
+    const mainCategory = categoryParts[1] || 'Uncategorized';
+    const subCategory = categoryParts[2] || '';
+    const categoryDisplayName = subCategory ? `${mainCategory}-${subCategory}` : mainCategory;
+
+    console.log('🤖 [categorizeBill] AI 分类:', aiCategory, '→', categoryDisplayName);
+    return { category: categoryDisplayName, source: 'ai' };
+  }
+
+  console.log('❓ [categorizeBill] 未分类，返回默认值');
+  return { category: '未分类', source: 'none' };
+}
+
+/**
+ * 批量分类账单（三层策略）
+ * 返回标准分类（15个分类之一）
+ */
+export async function categorizeBills(
+  bills: ParsedBill[]
+): Promise<Array<ParsedBill & { category: string }>> {
+  console.log('🏷️ [categorizeBills] 开始分类', bills.length, '条账单');
+
+  // 第一步：规则匹配，找出未分类的账单
+  const categorized: Array<ParsedBill & { category: string }> = [];
+  const uncategorized: Array<{ description: string; amount: number }> = [];
+
+  for (const bill of bills) {
+    // 第一层：检查原始分类
+    if (bill.originalData?.category) {
+      const originalCategory = bill.originalData.category as string;
+      if (originalCategory && originalCategory.trim() !== '') {
+        // 尝试将原始分类映射到标准分类
+        // 先尝试直接映射
+        if (isValidCategory(originalCategory)) {
+          categorized.push({ ...bill, category: getCategoryDisplayName(originalCategory as StandardCategory) });
+          continue;
+        }
+      }
+    }
+
+    // 第二层：规则匹配
+    const rules = getCategoryRules();
+    const sortedRules = [...rules].sort((a, b) => (b.priority || 0) - (a.priority || 0));
+    let matched = false;
+
+    for (const rule of sortedRules) {
+      if (rule.priority === 0) continue; // 跳过默认规则
+
+      const pattern = rule.pattern instanceof RegExp
+        ? rule.pattern
+        : new RegExp(rule.pattern, 'i');
+
+      if (pattern.test(bill.description)) {
+        // 将 Beancount 账户转换为标准分类
+        const standardCategory = beancountToCategory(rule.account);
+        if (standardCategory) {
+          const displayName = getCategoryDisplayName(standardCategory);
+          categorized.push({ ...bill, category: displayName });
+          matched = true;
+          break;
+        }
+      }
+    }
+
+    if (!matched) {
+      uncategorized.push({ description: bill.description, amount: bill.amount });
+    }
+  }
+
+  console.log('📊 [categorizeBills] 规则匹配完成:', categorized.length, '已分类,', uncategorized.length, '待 AI 分类');
+
+  // 第三步：如果有未分类的，使用 AI 批量分类
+  if (uncategorized.length > 0) {
+    console.log('🤖 [categorizeBills] 调用 AI 分类剩余', uncategorized.length, '条账单...');
+
+    try {
+      const aiCategoryCache = await categorizeByAI(uncategorized);
+
+      // 处理 AI 分类结果
+      uncategorized.forEach((item, index) => {
+        const bill = bills.find(b => b.description === item.description);
+        if (!bill) return;
+
+        if (aiCategoryCache.has(item.description)) {
+          const aiCategory = aiCategoryCache.get(item.description)!;
+          // AI 返回的应该是标准分类
+          if (isValidCategory(aiCategory)) {
+            const displayName = getCategoryDisplayName(aiCategory as StandardCategory);
+            categorized.push({ ...bill, category: displayName });
+          } else {
+            // AI 返回的不是标准分类，使用兜底
+            categorized.push({ ...bill, category: getCategoryDisplayName('Shopping-Daily' as StandardCategory) });
+          }
+        } else {
+          categorized.push({ ...bill, category: getCategoryDisplayName('Shopping-Daily' as StandardCategory) });
+        }
+      });
+    } catch (error) {
+      console.error('❌ [categorizeBills] AI 分类失败:', error);
+      // AI 失败，将未分类的标记为日用品（兜底）
+      uncategorized.forEach((item) => {
+        const bill = bills.find(b => b.description === item.description);
+        if (bill) {
+          categorized.push({ ...bill, category: getCategoryDisplayName('Shopping-Daily' as StandardCategory) });
+        }
+      });
+    }
+  }
+
+  // 统计分类分布
+  const categoryStats: Record<string, number> = {};
+  categorized.forEach(bill => {
+    categoryStats[bill.category] = (categoryStats[bill.category] || 0) + 1;
+  });
+
+  console.log('📊 [categorizeBills] 最终分类统计:', categoryStats);
+
+  return categorized;
 }

@@ -224,6 +224,110 @@ export default {
       }
     }
 
+    // 处理批量 AI 交易分类请求
+    if (url.pathname === '/api/batch-categorize' && request.method === 'POST') {
+      try {
+        const body = await request.json();
+        const { bills } = body;
+
+        if (!env.AI) {
+          return new Response(JSON.stringify({
+            error: 'AI 服务未配置'
+          }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        if (!bills || !Array.isArray(bills) || bills.length === 0) {
+          return new Response(JSON.stringify({
+            error: '缺少必要参数：bills (数组)'
+          }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        console.log(`批量分类 ${bills.length} 条账单`);
+
+        // 构建批量提示词
+        const prompt = `你是一个财务专家。请根据交易描述为以下 ${bills.length} 笔交易选择最合适的分类。
+
+可用分类列表（15个标准分类）：
+1. Food-Delivery - 外卖配送（美团、饿了么、汉堡王外卖等）
+2. Food-Restaurant - 餐厅用餐（小笼包、牛肉面、餐厅等）
+3. Food-Groceries - 生鲜食品（菜鲜果美、超市、菜市场等）
+4. Transport-Taxi - 打车出行（滴滴、网约车、出租车等）
+5. Transport-Public - 公共交通（地铁、公交、一卡通等）
+6. Shopping-Online - 网购（京东、淘宝、拼多多等电商平台）
+7. Shopping-Daily - 日用品（名创优品、便利店、百货等）
+8. Health-Medical - 医疗（医院、体检、药品、医保支付等）
+9. Health-Wellness - 保健（按摩、修脚、健身、美容等）
+10. Housing-Utilities - 水电燃气（水费、电费、燃气、桶装水、充电等）
+11. Housing-Internet - 网络通讯（宽带、话费、充值等）
+12. Education-Learning - 教育（培训、课程、书籍、学校等）
+13. Misc-Fees - 服务费用（手续费、代理费、服务费等）
+14. Misc-Charity - 公益捐赠（慈善捐款、公益组织等）
+15. Income-Refunds - 退款/转账（退款、转账收入等）
+16. Income-Salary - 工资收入（工资、奖金、薪资等）
+
+交易列表：
+${bills.map((b, i) => `${i + 1}. "${b.description}" (${Math.abs(b.amount)}元)`).join('\n')}
+
+请返回 JSON 格式：
+{
+  "categories": [
+    {"description": "交易描述1", "category": "Food-Delivery", "reasoning": "理由"},
+    {"description": "交易描述2", "category": "Transport-Taxi", "reasoning": "理由"}
+  ]
+}
+
+重要规则：
+- 必须从上述15个标准分类中选择
+- 支出选择 Food/Transport/Shopping/Health/Housing/Education/Misc 开头的分类
+- 收入选择 Income 开头的分类
+- 选择最具体、最相关的分类
+- 描述不明确的返回 Shopping-Daily`;
+
+        const response = await env.AI.run(
+          '@cf/meta/llama-3.1-8b-instruct',
+          {
+            messages: [{
+              role: 'user',
+              content: prompt,
+            }],
+            max_tokens: 4096,
+          }
+        );
+
+        const responseText = response.response || response;
+        console.log('AI 响应:', responseText.substring(0, 500));
+
+        // 解析 AI 响应
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          throw new Error('Failed to parse AI response');
+        }
+
+        const result = JSON.parse(jsonMatch[0]);
+
+        return new Response(JSON.stringify(result), {
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+          },
+        });
+      } catch (error) {
+        console.error('批量分类错误:', error);
+        return new Response(JSON.stringify({
+          error: error instanceof Error ? error.message : '批量分类失败'
+        }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     // 调用 React Router 处理其他请求
     try {
       console.log('Handling request with React Router:', url.pathname);

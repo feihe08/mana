@@ -16,8 +16,6 @@ import type { ParsedBill } from '../lib/parsers/csv';
 import type { ConversionResult } from '../lib/pipeline/conversion-pipeline';
 import type { Anomaly } from '../lib/client/anomaly';
 
-type BillSourceType = 'auto' | 'alipay' | 'wechat' | 'bank' | 'csv';
-
 export function meta() {
   return [
     { title: 'Mana - 账单转 Beancount 工具' },
@@ -31,7 +29,6 @@ export default function ConvertTool() {
 
   // 步骤 1 数据
   const [files, setFiles] = useState<File[]>([]);
-  const [sourceType, setSourceType] = useState<BillSourceType>('auto');
 
   // 步骤 2 数据
   const [parsedBills, setParsedBills] = useState<ParsedBill[]>([]);
@@ -66,15 +63,15 @@ export default function ConvertTool() {
     setError(null);
 
     try {
-      // 解析所有文件
+      // 解析所有文件（自动识别类型）
       const allBills = await Promise.all(
-        files.map((file) => parseBillFile(file, sourceType))
+        files.map((file) => parseBillFile(file, 'auto'))
       ).then((bills) => bills.flat());
 
       setParsedBills(allBills);
 
-      // 自动分类
-      const categorized = categorizeBills(allBills);
+      // 自动分类（现在包含 AI Fallback）
+      const categorized = await categorizeBills(allBills);
       setCategorizedBills(categorized);
 
       // 异常检测
@@ -107,8 +104,8 @@ export default function ConvertTool() {
         return;
       }
 
-      // 转换
-      const result = await convertBillsToBeancount(filteredBills, { sourceType });
+      // 转换（自动识别类型）
+      const result = await convertBillsToBeancount(filteredBills, { sourceType: 'auto' });
       setConversionResult(result);
 
       setCurrentStep(3);
@@ -211,9 +208,7 @@ export default function ConvertTool() {
           {currentStep === 1 && (
             <Step1Upload
               files={files}
-              sourceType={sourceType}
               onFilesChange={setFiles}
-              onSourceTypeChange={setSourceType}
               onNext={handleParseFiles}
               isParsing={isParsing}
             />
