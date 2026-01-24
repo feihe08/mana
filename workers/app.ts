@@ -12,7 +12,7 @@ const requestHandler = createRequestHandler({
 });
 
 /**
- * 构建给 AI 的提示词
+ * 构建给 AI 的提示词 - 用于列识别
  */
 function buildPrompt(headers, source) {
   return `你是一个账单解析专家。请分析以下 CSV 表头，识别关键列的索引位置。
@@ -38,6 +38,33 @@ function buildPrompt(headers, source) {
 - 交易对方可能命名为：交易对方、对方、商户、Merchant、收款方
 - 如果某个列不存在，设为 -1
 - confidence 表示你对识别结果的信心（列名越明确越高，范围 0-1）`;
+}
+
+/**
+ * 构建给 AI 的提示词 - 用于交易分类
+ */
+function buildCategorizePrompt(description, amount, availableAccounts) {
+  return `你是一个财务专家。请根据交易描述选择最合适的 Beancount 账户。
+
+交易描述：${description}
+金额：${Math.abs(amount)} 元
+${amount < 0 ? '类型：支出（费用账户）' : '类型：收入（收入账户）'}
+
+可用账户列表：
+${availableAccounts.map((acc, i) => `${i + 1}. ${acc}`).join('\n')}
+
+请返回 JSON 格式：
+{
+  "account": "选择的账户名称",
+  "confidence": 置信度 (0-1),
+  "reasoning": "选择理由（简短说明）"
+}
+
+规则：
+- 支出选择 Expenses 开头的账户
+- 收入选择 Income 开头的账户
+- 选择最具体、最相关的账户
+- confidence 应基于描述的清晰程度`;
 }
 
 /**
@@ -125,6 +152,71 @@ export default {
       } catch (error) {
         return new Response(JSON.stringify({
           error: error instanceof Error ? error.message : '识别失败'
+        }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // 处理 AI 交易分类请求
+    if (url.pathname === '/api/categorize' && request.method === 'POST') {
+      try {
+        const body = await request.json();
+        const { description, amount, availableAccounts } = body;
+
+        if (!env.AI) {
+          return new Response(JSON.stringify({
+            error: 'AI 服务未配置'
+          }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        if (!description || amount === undefined) {
+          return new Response(JSON.stringify({
+            error: '缺少必要参数：description 或 amount'
+          }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        const response = await env.AI.run(
+          '@cf/meta/llama-3.1-8b-instruct',
+          {
+            messages: [{
+              role: 'user',
+              content: buildCategorizePrompt(
+                description,
+                amount,
+                availableAccounts || []
+              ),
+            }],
+            max_tokens: 512,
+          }
+        );
+
+        const responseText = response.response || response;
+
+        // 解析 AI 响应
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          throw new Error('Failed to parse AI response');
+        }
+
+        const result = JSON.parse(jsonMatch[0]);
+
+        return new Response(JSON.stringify(result), {
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+          },
+        });
+      } catch (error) {
+        return new Response(JSON.stringify({
+          error: error instanceof Error ? error.message : '分类失败'
         }), {
           status: 500,
           headers: { 'Content-Type': 'application/json' },
