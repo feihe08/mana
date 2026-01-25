@@ -2,6 +2,7 @@
  * 步骤 3：转换结果组件
  */
 
+import { Link } from 'react-router';
 import type { ConversionResult } from '../../lib/pipeline/conversion-pipeline';
 
 interface Step3ResultProps {
@@ -34,9 +35,15 @@ export function Step3Result({ result, onDownload, onRestart }: Step3ResultProps)
           </svg>
           <h2 className="text-2xl font-bold text-white">转换成功！</h2>
         </div>
-        <p className="text-gray-300">
+        <p className="text-gray-300 mb-3">
           已成功将 {result.billCount} 条账单转换为 Beancount 格式
         </p>
+        <div className="flex items-center gap-2 text-sm text-green-400">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+          </svg>
+          文件已自动保存到云端
+        </div>
       </div>
 
       {/* 统计信息 */}
@@ -101,16 +108,27 @@ export function Step3Result({ result, onDownload, onRestart }: Step3ResultProps)
       </div>
 
       {/* 操作按钮 */}
-      <div className="flex justify-between items-center">
-        <button
-          onClick={onRestart}
-          className="px-6 py-3 text-gray-400 hover:text-white transition-colors font-medium flex items-center gap-2"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          重新开始
-        </button>
+      <div className="flex flex-wrap justify-between items-center gap-4">
+        <div className="flex gap-3">
+          <button
+            onClick={onRestart}
+            className="px-6 py-3 text-gray-400 hover:text-white transition-colors font-medium flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            重新开始
+          </button>
+          <Link
+            to="/bills"
+            className="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-medium transition-colors flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            查看账单历史
+          </Link>
+        </div>
         <button
           onClick={onDownload}
           className="px-8 py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-xl font-semibold transition-all shadow-lg shadow-green-500/25 flex items-center gap-3"
