@@ -8,7 +8,7 @@ import { parseAlipayCSV } from "../parsers/alipay";
 import { parseWeChatCSV } from "../parsers/wechat";
 import { parseCSV } from "../parsers/csv";
 import { parseBillWithAI } from "../parsers/smart-parser";
-import { getCategoryRules } from "../beancount/default-accounts";
+import { getCategoryRules, DEFAULT_ACCOUNT_MAPPING } from "../beancount/default-accounts";
 import {
   beancountToCategory,
   getCategoryDisplayName,
@@ -16,6 +16,7 @@ import {
   type StandardCategory,
 } from "../beancount/category-taxonomy";
 import type { ParsedBill } from "../parsers/csv";
+import type { CategoryRule } from "../beancount/types";
 
 export type { ParsedBill };
 
@@ -25,6 +26,36 @@ export type { ParsedBill };
 export interface SmartParseOptions {
   forceReidentify?: boolean;
   onRecognizing?: (isRecognizing: boolean) => void;
+}
+
+/**
+ * 从云端获取用户规则（包括自定义规则）
+ * 如果请求失败，返回默认规则
+ */
+async function fetchUserRules(): Promise<CategoryRule[]> {
+  try {
+    const response = await fetch('/api/settings');
+    if (!response.ok) {
+      console.warn('⚠️ [fetchUserRules] 获取云端规则失败，使用默认规则');
+      return getCategoryRules();
+    }
+
+    const data = await response.json();
+
+    // 将字符串 pattern 转换回 RegExp 对象
+    const rules = (data.allRules || getCategoryRules()).map((rule: any) => ({
+      ...rule,
+      pattern: typeof rule.pattern === 'string'
+        ? new RegExp(rule.pattern, 'i')
+        : rule.pattern,
+    }));
+
+    console.log('📋 [fetchUserRules] 获取到规则:', rules.length, '条');
+    return rules;
+  } catch (error) {
+    console.error('❌ [fetchUserRules] 获取云端规则出错:', error);
+    return getCategoryRules();
+  }
 }
 
 /**
@@ -169,11 +200,12 @@ async function categorizeSingleBill(
     }
   }
 
-  // 第二层：规则匹配
-  const rules = getCategoryRules();
-  const sortedRules = [...rules].sort((a, b) => (b.priority || 0) - (a.priority || 0));
+  // 第二层：规则匹配（暂时只使用默认规则）
+  // TODO: 支持用户自定义规则
+  const defaultRules = getCategoryRules();
+  const allRules = defaultRules.sort((a, b) => (b.priority || 0) - (a.priority || 0));
 
-  for (const rule of sortedRules) {
+  for (const rule of allRules) {
     // 跳过默认规则（priority: 0）
     if (rule.priority === 0) continue;
 
@@ -217,6 +249,9 @@ export async function categorizeBills(
 ): Promise<Array<ParsedBill & { category: string }>> {
   console.log('🏷️ [categorizeBills] 开始分类', bills.length, '条账单');
 
+  // 从云端获取规则（包含用户自定义规则）
+  const rules = await fetchUserRules();
+
   // 第一步：规则匹配，找出未分类的账单
   const categorized: Array<ParsedBill & { category: string }> = [];
   const uncategorized: Array<{ description: string; amount: number }> = [];
@@ -235,8 +270,7 @@ export async function categorizeBills(
       }
     }
 
-    // 第二层：规则匹配
-    const rules = getCategoryRules();
+    // 第二层：规则匹配（使用云端规则）
     const sortedRules = [...rules].sort((a, b) => (b.priority || 0) - (a.priority || 0));
     let matched = false;
 
