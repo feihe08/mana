@@ -209,7 +209,10 @@ export function meta() { // ❌ 缺少参数
   - ✅ 更新 wrangler.toml 配置
   - ✅ 重构 schema.sql（新 uploads 表替代原 bills 表）
   - ✅ 本地和生产环境数据库表创建成功
-  - ⏳ 等待用户在 Dashboard 启用 R2
+  - ✅ 创建 R2 存储桶（mana-uploads）
+  - ✅ **阶段2完成**：实现服务层
+    - 创建 `app/lib/db/uploads.ts` - D1 数据库操作
+    - 创建 `app/lib/storage/files.ts` - R2 文件存储操作
 - ⚠️ 明确不需要统计分析页面（使用 Fava 查看 bean 文件即可）
 
 ### 2025-01-16
