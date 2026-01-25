@@ -221,6 +221,12 @@ export function meta() { // ❌ 缺少参数
     - 修改 `app/routes/_index.tsx` - 转换后上传到云端 API
     - 修改 `app/routes/bills.tsx` - 使用 loader 从 D1 获取数据
     - 创建 `app/routes/api.download.ts` - bean 文件下载 API
+  - ✅ **阶段5完成**：测试和部署
+    - 删除不再使用的 `app/lib/client/storage.ts`
+    - 修复 React Router v7 Cloudflare context 访问路径
+      - 路径：`args.context.cloudflare.env` 而非 `args.context.env`
+    - 在 `app/routes.ts` 注册所有 API 路由
+    - 部署成功，API 正常工作
 - ⚠️ 明确不需要统计分析页面（使用 Fava 查看 bean 文件即可）
 
 ### 2025-01-16
