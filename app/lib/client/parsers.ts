@@ -143,8 +143,8 @@ async function categorizeByAI(
   const result = await request.json();
   const categoryMap = new Map<string, string>();
 
-  result.categories.forEach((item: { description: string; account: string }) => {
-    categoryMap.set(item.description, item.account);
+  result.categories.forEach((item: { description: string; category: string }) => {
+    categoryMap.set(item.description, item.category);
   });
 
   console.log('✅ [categorizeByAI] AI 分类完成');
