@@ -118,7 +118,7 @@ export default function AnalyticsPage() {
     if (!transactions || transactions.length === 0) {
       return null;
     }
-    return calculateSummary(transactions);
+    return calculateSummary(transactions, 'all');
   }, [transactions]);
 
   // 分类统计（不受时间筛选影响，始终显示所有数据）

@@ -85,19 +85,32 @@ function getDaysInMonth(dateStr: string): number {
  */
 export function calculateSummary(
   transactions: Transaction[],
-  currentMonth?: string
+  currentMonth?: string | 'all'
 ): SummaryStats {
-  // 筛选本月数据
-  const current = currentMonth || new Date().toISOString().substring(0, 7);
-  const currentMonthTxs = transactions.filter(tx =>
-    tx.transactionDate.startsWith(current)
-  );
+  // 判断是否计算全部数据
+  const isAllTime = currentMonth === 'all';
 
-  // 计算上月
-  const lastMonth = getLastMonth(current);
-  const lastMonthTxs = transactions.filter(tx =>
-    tx.transactionDate.startsWith(lastMonth)
-  );
+  // 筛选要统计的数据
+  let currentMonthTxs: Transaction[];
+  let lastMonthTxs: Transaction[] = [];
+
+  if (isAllTime) {
+    // 计算全部数据
+    currentMonthTxs = transactions;
+    lastMonthTxs = []; // 全部数据不需要对比上月
+  } else {
+    // 筛选本月数据
+    const current = currentMonth || new Date().toISOString().substring(0, 7);
+    currentMonthTxs = transactions.filter(tx =>
+      tx.transactionDate.startsWith(current)
+    );
+
+    // 计算上月
+    const lastMonth = getLastMonth(current);
+    lastMonthTxs = transactions.filter(tx =>
+      tx.transactionDate.startsWith(lastMonth)
+    );
+  }
 
   // 本月统计
   const expenseTxs = currentMonthTxs.filter(isExpense);
@@ -107,7 +120,8 @@ export function calculateSummary(
   const income = incomeTxs.reduce((sum, tx) => sum + tx.amount, 0);
 
   // 调试日志
-  console.log('📊 [calculateSummary] 本月交易统计:', {
+  console.log('📊 [calculateSummary] 交易统计:', {
+    范围: isAllTime ? '全部时间' : (currentMonth || '本月'),
     总交易数: currentMonthTxs.length,
     支出交易数: expenseTxs.length,
     收入交易数: incomeTxs.length,
@@ -117,13 +131,18 @@ export function calculateSummary(
   });
 
   // 上月统计（用于对比）
-  const lastMonthExpenses = lastMonthTxs
-    .filter(isExpense)
-    .reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+  let lastMonthExpenses = 0;
+  let lastMonthIncome = 0;
 
-  const lastMonthIncome = lastMonthTxs
-    .filter(isIncome)
-    .reduce((sum, tx) => sum + tx.amount, 0);
+  if (!isAllTime) {
+    lastMonthExpenses = lastMonthTxs
+      .filter(isExpense)
+      .reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+
+    lastMonthIncome = lastMonthTxs
+      .filter(isIncome)
+      .reduce((sum, tx) => sum + tx.amount, 0);
+  }
 
   // 最大支出
   const maxTx = expenseTxs.reduce((max, tx) =>
@@ -132,23 +151,25 @@ export function calculateSummary(
   );
 
   // 计算对比
-  const expensesVsLastMonth = lastMonthExpenses > 0
+  const expensesVsLastMonth = !isAllTime && lastMonthExpenses > 0
     ? ((expenses - lastMonthExpenses) / lastMonthExpenses) * 100
     : 0;
 
-  const incomeVsLastMonth = lastMonthIncome > 0
+  const incomeVsLastMonth = !isAllTime && lastMonthIncome > 0
     ? ((income - lastMonthIncome) / lastMonthIncome) * 100
     : 0;
 
   const currentSavings = income - expenses;
   const lastMonthSavings = lastMonthIncome - lastMonthExpenses;
-  const savingsVsLastMonth = lastMonthSavings > 0
+  const savingsVsLastMonth = !isAllTime && lastMonthSavings > 0
     ? ((currentSavings - lastMonthSavings) / lastMonthSavings) * 100
     : 0;
 
-  // 日均支出
-  const daysInMonth = getDaysInMonth(currentMonthTxs[0]?.transactionDate || new Date().toISOString());
-  const avgDailyExpense = expenses / daysInMonth;
+  // 日均支出（只对月度数据有意义）
+  const daysInMonth = !isAllTime && currentMonthTxs.length > 0
+    ? getDaysInMonth(currentMonthTxs[0]?.transactionDate || new Date().toISOString())
+    : 1;
+  const avgDailyExpense = !isAllTime ? expenses / daysInMonth : 0;
 
   return {
     totalExpenses: Math.round(expenses * 100) / 100,
