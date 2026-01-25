@@ -213,6 +213,13 @@ export default function ConvertTool() {
             </Link>
             <span className="text-gray-600">|</span>
             <Link
+              to="/analytics"
+              className="text-purple-400 hover:text-purple-300 text-sm flex items-center gap-2"
+            >
+              📈 数据分析
+            </Link>
+            <span className="text-gray-600">|</span>
+            <Link
               to="/settings"
               className="text-purple-400 hover:text-purple-300 text-sm flex items-center gap-2"
             >
