@@ -102,25 +102,25 @@ export function calculateSummary(
   // 本月统计
   const expenses = currentMonthTxs
     .filter(isExpense)
-    .reduce((sum, tx) => sum + tx.amount, 0);
+    .reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
 
   const income = currentMonthTxs
     .filter(isIncome)
-    .reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+    .reduce((sum, tx) => sum + tx.amount, 0);
 
   // 上月统计（用于对比）
   const lastMonthExpenses = lastMonthTxs
     .filter(isExpense)
-    .reduce((sum, tx) => sum + tx.amount, 0);
+    .reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
 
   const lastMonthIncome = lastMonthTxs
     .filter(isIncome)
-    .reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+    .reduce((sum, tx) => sum + tx.amount, 0);
 
   // 最大支出
   const expenseTxs = currentMonthTxs.filter(isExpense);
   const maxTx = expenseTxs.reduce((max, tx) =>
-    tx.amount > max.amount ? tx : max,
+    Math.abs(tx.amount) > Math.abs(max.amount) ? tx : max,
     expenseTxs[0] || { amount: 0, description: '无' }
   );
 
@@ -149,7 +149,7 @@ export function calculateSummary(
     netSavings: Math.round(currentSavings * 100) / 100,
     transactionCount: currentMonthTxs.length,
     avgDailyExpense: Math.round(avgDailyExpense * 100) / 100,
-    maxExpense: Math.round(maxTx.amount * 100) / 100,
+    maxExpense: Math.round(Math.abs(maxTx.amount) * 100) / 100,
     maxExpenseDescription: maxTx.description,
     expensesVsLastMonth: Math.round(expensesVsLastMonth),
     incomeVsLastMonth: Math.round(incomeVsLastMonth),

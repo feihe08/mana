@@ -65,10 +65,12 @@ export function aggregateByMonth(
     const data = monthlyMap.get(monthKey)!;
     data.count += 1;
 
-    if (tx.amount >= 0) {
-      data.expenses += tx.amount;
+    if (tx.amount < 0) {
+      // 负数表示支出
+      data.expenses += Math.abs(tx.amount);
     } else {
-      data.income += Math.abs(tx.amount);
+      // 正数或零表示收入
+      data.income += tx.amount;
     }
   }
 
