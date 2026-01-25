@@ -113,13 +113,13 @@ export default function AnalyticsPage() {
     });
   }, [transactions, dateRange]);
 
-  // 计算统计数据（受时间筛选影响）
+  // 计算统计数据（使用全部数据，不受时间筛选影响）
   const summary = useMemo(() => {
-    if (!filteredTransactions || filteredTransactions.length === 0) {
+    if (!transactions || transactions.length === 0) {
       return null;
     }
-    return calculateSummary(filteredTransactions);
-  }, [filteredTransactions]);
+    return calculateSummary(transactions);
+  }, [transactions]);
 
   // 分类统计（不受时间筛选影响，始终显示所有数据）
   const categoryStats = useMemo(() => {

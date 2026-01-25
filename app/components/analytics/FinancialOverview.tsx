@@ -67,7 +67,7 @@ function FinancialOverview({
       <div className="grid grid-cols-3 gap-6">
         {/* 支出 */}
         <div className="text-center">
-          <p className="text-sm text-gray-400 mb-2">本月支出</p>
+          <p className="text-sm text-gray-400 mb-2">总支出（全部时间）</p>
           <p className="text-3xl font-bold text-red-400 mb-1">
             ¥{Math.abs(totalExpenses).toLocaleString(undefined, { maximumFractionDigits: 0 })}
           </p>
@@ -76,7 +76,7 @@ function FinancialOverview({
 
         {/* 收入 */}
         <div className="text-center">
-          <p className="text-sm text-gray-400 mb-2">本月收入</p>
+          <p className="text-sm text-gray-400 mb-2">总收入（全部时间）</p>
           <p className="text-3xl font-bold text-green-400 mb-1">
             ¥{totalIncome.toLocaleString(undefined, { maximumFractionDigits: 0 })}
           </p>
@@ -85,7 +85,7 @@ function FinancialOverview({
 
         {/* 储蓄 */}
         <div className="text-center">
-          <p className="text-sm text-gray-400 mb-2">净储蓄</p>
+          <p className="text-sm text-gray-400 mb-2">净储蓄（全部时间）</p>
           <p className={`text-3xl font-bold mb-1 ${netSavings >= 0 ? 'text-blue-400' : 'text-red-400'}`}>
             ¥{netSavings.toLocaleString(undefined, { maximumFractionDigits: 0 })}
           </p>

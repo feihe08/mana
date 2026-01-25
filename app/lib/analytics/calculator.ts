@@ -100,13 +100,21 @@ export function calculateSummary(
   );
 
   // 本月统计
-  const expenses = currentMonthTxs
-    .filter(isExpense)
-    .reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+  const expenseTxs = currentMonthTxs.filter(isExpense);
+  const incomeTxs = currentMonthTxs.filter(isIncome);
 
-  const income = currentMonthTxs
-    .filter(isIncome)
-    .reduce((sum, tx) => sum + tx.amount, 0);
+  const expenses = expenseTxs.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+  const income = incomeTxs.reduce((sum, tx) => sum + tx.amount, 0);
+
+  // 调试日志
+  console.log('📊 [calculateSummary] 本月交易统计:', {
+    总交易数: currentMonthTxs.length,
+    支出交易数: expenseTxs.length,
+    收入交易数: incomeTxs.length,
+    支出总额: expenses,
+    收入总额: income,
+    储蓄: income - expenses,
+  });
 
   // 上月统计（用于对比）
   const lastMonthExpenses = lastMonthTxs
@@ -118,7 +126,6 @@ export function calculateSummary(
     .reduce((sum, tx) => sum + tx.amount, 0);
 
   // 最大支出
-  const expenseTxs = currentMonthTxs.filter(isExpense);
   const maxTx = expenseTxs.reduce((max, tx) =>
     Math.abs(tx.amount) > Math.abs(max.amount) ? tx : max,
     expenseTxs[0] || { amount: 0, description: '无' }
