@@ -3,13 +3,13 @@
  * GET /api/download?id={uploadId}
  */
 
-import type { LoaderFunctionArgs } from 'react-router';
 import { getDB, getBucket } from '../lib/server';
 import { getUploadById } from '../lib/db/uploads';
 import { getBeanFile } from '../lib/storage/files';
 
-export async function loader({ request, context }: LoaderFunctionArgs) {
+export async function loader(args: any) {
   try {
+    const request = args.request;
     const url = new URL(request.url);
     const id = url.searchParams.get('id');
 
@@ -17,8 +17,8 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
       return new Response('缺少必要参数：id', { status: 400 });
     }
 
-    const db = getDB(context);
-    const bucket = getBucket(context);
+    const db = getDB(args);
+    const bucket = getBucket(args);
 
     // 1. 查询上传记录
     const upload = await getUploadById(db, id);

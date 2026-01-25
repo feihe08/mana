@@ -9,15 +9,15 @@
  * - search: 文件名搜索关键词
  */
 
-import type { LoaderFunctionArgs } from 'react-router';
 import { getDB } from '../lib/server';
 import { getUploads, type UploadFilters } from '../lib/db/uploads';
 
-export async function loader({ request, context }: LoaderFunctionArgs) {
+export async function loader(args: any) {
   try {
-    const db = getDB(context);
+    const db = getDB(args);
 
     // 解析查询参数
+    const request = args.request;
     const url = new URL(request.url);
     const filters: UploadFilters = {};
 

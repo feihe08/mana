@@ -3,16 +3,16 @@
  * POST /api/upload
  */
 
-import type { ActionFunctionArgs } from 'react-router';
 import { getDB, getBucket } from '../lib/server';
 import { saveUpload } from '../lib/db/uploads';
 import { saveRawFile, saveBeanFile } from '../lib/storage/files';
 import { convertBillsToBeancount } from '../lib/pipeline/conversion-pipeline';
 
-export async function action({ request, context }: ActionFunctionArgs) {
+export async function action(args: any) {
   try {
-    const db = getDB(context);
-    const bucket = getBucket(context);
+    const db = getDB(args);
+    const bucket = getBucket(args);
+    const request = args.request;
 
     // 1. 接收文件和解析后的数据
     const formData = await request.formData();

@@ -5,7 +5,6 @@
 
 import { useState } from 'react';
 import { Link, Form, useLoaderData, useNavigation } from 'react-router';
-import type { LoaderFunctionArgs } from 'react-router';
 import { getDB } from '../lib/server';
 import { getUploads, type Upload } from '../lib/db/uploads';
 
@@ -16,8 +15,8 @@ export function meta() {
   ];
 }
 
-export async function loader({ context }: LoaderFunctionArgs) {
-  const db = getDB(context);
+export async function loader(args: any) {
+  const db = getDB(args);
   const uploads = await getUploads(db);
   return { uploads };
 }

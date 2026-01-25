@@ -6,13 +6,13 @@
  * - id: 上传记录 ID
  */
 
-import type { ActionFunctionArgs } from 'react-router';
 import { getDB, getBucket } from '../lib/server';
 import { deleteUpload as deleteFromDB } from '../lib/db/uploads';
 import { deleteUploadFiles } from '../lib/storage/files';
 
-export async function action({ request, context }: ActionFunctionArgs) {
+export async function action(args: any) {
   try {
+    const request = args.request;
     const formData = await request.formData();
     const id = formData.get('id') as string;
 
@@ -23,8 +23,8 @@ export async function action({ request, context }: ActionFunctionArgs) {
       );
     }
 
-    const db = getDB(context);
-    const bucket = getBucket(context);
+    const db = getDB(args);
+    const bucket = getBucket(args);
 
     // 1. 先删除 R2 文件
     await deleteUploadFiles(bucket, id);
