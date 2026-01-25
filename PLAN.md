@@ -217,6 +217,10 @@ export function meta() { // ❌ 缺少参数
     - 创建 `app/routes/api.upload.ts` - 文件上传 API
     - 创建 `app/routes/api.uploads.ts` - 列表查询 API
     - 创建 `app/routes/api.delete-upload.ts` - 删除 API
+  - ✅ **阶段4完成**：修改现有页面，迁移到云端
+    - 修改 `app/routes/_index.tsx` - 转换后上传到云端 API
+    - 修改 `app/routes/bills.tsx` - 使用 loader 从 D1 获取数据
+    - 创建 `app/routes/api.download.ts` - bean 文件下载 API
 - ⚠️ 明确不需要统计分析页面（使用 Fava 查看 bean 文件即可）
 
 ### 2025-01-16

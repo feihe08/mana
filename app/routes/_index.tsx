@@ -13,7 +13,6 @@ import { parseBillFile } from '../lib/client/parsers';
 import { categorizeBills } from '../lib/client/parsers';
 import { detectAnomalies } from '../lib/client/anomaly';
 import { convertBillsToBeancount } from '../lib/pipeline/conversion-pipeline';
-import { saveBills, getBillsHistory } from '../lib/client/storage';
 import type { ParsedBill } from '../lib/parsers/csv';
 import type { ConversionResult } from '../lib/pipeline/conversion-pipeline';
 import type { Anomaly } from '../lib/client/anomaly';
@@ -108,14 +107,29 @@ export default function ConvertTool() {
 
       // 转换（自动识别类型）
       const result = await convertBillsToBeancount(filteredBills, { sourceType: 'auto' });
-      setConversionResult(result);
 
-      // 保存到本地存储
-      const fileName = files.length > 0
-        ? files[0].name.replace(/\.[^/.]+$/, '')
-        : `账单-${new Date().toISOString().split('T')[0]}`;
+      // 上传到服务器
+      if (files.length > 0) {
+        const formData = new FormData();
+        formData.append('file', files[0]);
+        formData.append('bills', JSON.stringify(filteredBills));
+        formData.append('fileType', 'auto');
 
-      saveBills(fileName, filteredBills, result.beancountContent);
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json() as { error?: string; message?: string };
+          throw new Error(errorData.message || errorData.error || '上传失败');
+        }
+
+        // API 返回的 beancountContent 与本地的相同
+        setConversionResult(result);
+      } else {
+        setConversionResult(result);
+      }
 
       setCurrentStep(3);
     } catch (err) {
