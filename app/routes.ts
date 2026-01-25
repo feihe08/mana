@@ -8,4 +8,5 @@ export default [
   route("/api/uploads", "routes/api.uploads.ts"),
   route("/api/delete-upload", "routes/api.delete-upload.ts"),
   route("/api/download", "routes/api.download.ts"),
+  route("/api/download-raw", "routes/api.download-raw.ts"),
 ] satisfies RouteConfig;
