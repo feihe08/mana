@@ -12,14 +12,14 @@ binding = "ASSETS"
 [ai]
 binding = "AI"
 
-# [[d1_databases]]
-# binding = "DB"
-# database_name = "mana-db"
-# database_id = "your-database-id"
+[[d1_databases]]
+binding = "DB"
+database_name = "mana-db"
+database_id = "fd67e0ee-85da-42b2-aa1b-c3f3f101100f"
 
-# [[r2_buckets]]
-# binding = "BUCKET"
-# bucket_name = "mana-uploads"
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "mana-uploads"
 
 # 在部署前需要运行：wrangler d1 create mana-db
 # 然后将返回的 database_id 填入上面
