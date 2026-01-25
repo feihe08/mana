@@ -49,14 +49,14 @@ export interface DateRange {
  * 判断交易是否为支出
  */
 function isExpense(tx: Transaction): boolean {
-  return tx.amount >= 0;
+  return tx.amount < 0; // 负数表示支出
 }
 
 /**
  * 判断交易是否为收入
  */
 function isIncome(tx: Transaction): boolean {
-  return tx.amount < 0; // 负数表示支出（beancount 约定）
+  return tx.amount >= 0; // 非负数表示收入
 }
 
 /**
