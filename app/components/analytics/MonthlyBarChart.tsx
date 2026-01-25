@@ -38,10 +38,9 @@ function MonthlyBarChart({ monthlyData, months = 6 }: MonthlyBarChartProps) {
     );
   }
 
-  // 准备图表数据（取最近 N 个月，并反转顺序）
+  // 准备图表数据（取最近 N 个月，按时间顺序排列）
   const chartData: ChartData[] = monthlyData
     .slice(-months)
-    .reverse()
     .map(data => ({
       month: data.month,
       支出: Math.abs(data.expenses),

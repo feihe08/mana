@@ -40,10 +40,9 @@ function TrendLineChart({ monthlyData, months = 6 }: TrendLineChartProps) {
     );
   }
 
-  // 准备图表数据（取最近 N 个月，并反转顺序使最新月份在右侧）
+  // 准备图表数据（取最近 N 个月，按时间顺序排列）
   const chartData: ChartData[] = monthlyData
     .slice(-months)
-    .reverse()
     .map(data => ({
       month: data.month,
       支出: Math.abs(data.expenses),

@@ -30,6 +30,7 @@ import { CategoryList } from '../components/analytics/CategoryList';
 import CategoryPieChart from '../components/analytics/CategoryPieChart';
 import TrendLineChart from '../components/analytics/TrendLineChart';
 import MonthlyBarChart from '../components/analytics/MonthlyBarChart';
+import FinancialOverview from '../components/analytics/FinancialOverview';
 import { BudgetProgress } from '../components/analytics/BudgetProgress';
 import { AnomalyAlert } from '../components/analytics/AnomalyAlert';
 import { DateRangeFilter } from '../components/analytics/DateRangeFilter';
@@ -112,7 +113,7 @@ export default function AnalyticsPage() {
     });
   }, [transactions, dateRange]);
 
-  // 计算统计数据
+  // 计算统计数据（受时间筛选影响）
   const summary = useMemo(() => {
     if (!filteredTransactions || filteredTransactions.length === 0) {
       return null;
@@ -120,12 +121,13 @@ export default function AnalyticsPage() {
     return calculateSummary(filteredTransactions);
   }, [filteredTransactions]);
 
+  // 分类统计（不受时间筛选影响，始终显示所有数据）
   const categoryStats = useMemo(() => {
-    if (!filteredTransactions || filteredTransactions.length === 0) {
+    if (!transactions || transactions.length === 0) {
       return [];
     }
-    return aggregateByCategory(filteredTransactions);
-  }, [filteredTransactions]);
+    return aggregateByCategory(transactions);
+  }, [transactions]);
 
   const budgetComparisons = useMemo(() => {
     if (!filteredTransactions || filteredTransactions.length === 0 || !budgets) {
@@ -216,10 +218,17 @@ export default function AnalyticsPage() {
           />
         </div>
 
-        {/* 统计卡片 */}
+        {/* 财务概览 - 一目了然 */}
         {summary && (
           <div className="mb-8">
-            <StatsCards stats={summary} />
+            <FinancialOverview
+              totalExpenses={summary.totalExpenses}
+              totalIncome={summary.totalIncome}
+              netSavings={summary.netSavings}
+              expensesVsLastMonth={summary.expensesVsLastMonth}
+              incomeVsLastMonth={summary.incomeVsLastMonth}
+              savingsVsLastMonth={summary.savingsVsLastMonth}
+            />
           </div>
         )}
 
@@ -227,34 +236,20 @@ export default function AnalyticsPage() {
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-white mb-6">📊 可视化分析</h2>
 
-          {/* 第一行：饼图 + 折线图 */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            {/* 饼图 */}
-            {categoryStats.length > 0 && (
+          {/* 第一行：饼图 */}
+          {categoryStats.length > 0 && (
+            <div className="mb-6">
               <CategoryPieChart categories={categoryStats} maxItems={8} />
-            )}
+            </div>
+          )}
 
-            {/* 折线图 */}
-            {monthlyData.length > 0 && (
-              <TrendLineChart monthlyData={monthlyData} months={6} />
-            )}
-          </div>
-
-          {/* 第二行：柱状图 */}
+          {/* 第二行：折线图（月度趋势） */}
           {monthlyData.length > 0 && (
             <div className="mb-6">
-              <MonthlyBarChart monthlyData={monthlyData} months={6} />
+              <TrendLineChart monthlyData={monthlyData} months={6} />
             </div>
           )}
         </div>
-
-        {/* 分类列表详情 */}
-        {categoryStats.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-white mb-6">🏷️ 分类详情</h2>
-            <CategoryList categories={categoryStats} />
-          </div>
-        )}
 
         {/* 两列布局：预算 + 异常 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
