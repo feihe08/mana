@@ -6,6 +6,7 @@
  * - id: 上传记录 ID
  */
 
+import { redirect } from 'react-router';
 import { getDB, getBucket } from '../lib/server';
 import { deleteUpload as deleteFromDB } from '../lib/db/uploads';
 import { deleteUploadFiles } from '../lib/storage/files';
@@ -39,10 +40,8 @@ export async function action(args: any) {
       );
     }
 
-    return Response.json({
-      success: true,
-      message: '删除成功',
-    });
+    // 删除成功后重定向回账单历史页面
+    return redirect('/bills');
   } catch (error) {
     console.error('Delete upload error:', error);
     return Response.json(
