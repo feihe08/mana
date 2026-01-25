@@ -213,6 +213,10 @@ export function meta() { // ❌ 缺少参数
   - ✅ **阶段2完成**：实现服务层
     - 创建 `app/lib/db/uploads.ts` - D1 数据库操作
     - 创建 `app/lib/storage/files.ts` - R2 文件存储操作
+  - ✅ **阶段3完成**：实现 API 端点
+    - 创建 `app/routes/api.upload.ts` - 文件上传 API
+    - 创建 `app/routes/api.uploads.ts` - 列表查询 API
+    - 创建 `app/routes/api.delete-upload.ts` - 删除 API
 - ⚠️ 明确不需要统计分析页面（使用 Fava 查看 bean 文件即可）
 
 ### 2025-01-16
