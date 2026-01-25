@@ -7,6 +7,8 @@ import { getDB, getBucket } from '../lib/server';
 import { saveUpload } from '../lib/db/uploads';
 import { saveRawFile, saveBeanFile } from '../lib/storage/files';
 import { convertBillsToBeancount } from '../lib/pipeline/conversion-pipeline';
+import { validateFile, formatValidationError } from '../lib/utils/file-validation';
+import { validateBills, formatValidationErrors, sanitizeBills } from '../lib/utils/data-validation';
 
 export async function action(args: any) {
   try {
@@ -27,31 +29,81 @@ export async function action(args: any) {
       );
     }
 
-    const bills = JSON.parse(billsJson);
-
-    if (!Array.isArray(bills) || bills.length === 0) {
+    // 2. 验证文件
+    const fileValidation = validateFile(file);
+    if (!fileValidation.valid) {
+      const errorMessage = formatValidationError(fileValidation.error);
       return Response.json(
-        { error: 'bills 必须是非空数组' },
+        {
+          error: '文件验证失败',
+          message: errorMessage,
+          details: fileValidation.error,
+        },
         { status: 400 }
       );
     }
 
-    // 2. 生成上传 ID
+    // 3. 解析账单数据
+    let bills;
+    try {
+      bills = JSON.parse(billsJson);
+    } catch (parseError) {
+      return Response.json(
+        {
+          error: '数据解析失败',
+          message: '无法解析账单数据，请确保数据格式正确',
+        },
+        { status: 400 }
+      );
+    }
+
+    // 4. 验证账单数据
+    const dataValidation = validateBills(bills);
+    if (!dataValidation.valid) {
+      const errorMessage = formatValidationErrors(dataValidation.errors);
+      return Response.json(
+        {
+          error: '数据验证失败',
+          message: errorMessage,
+          details: dataValidation.errors,
+          errorCount: dataValidation.errors.length,
+        },
+        { status: 400 }
+      );
+    }
+
+    // 5. 清理数据（移除无效记录，如果有）
+    const { valid: cleanBills, invalid } = sanitizeBills(bills);
+    if (invalid > 0) {
+      console.warn(`清理了 ${invalid} 条无效记录，保留 ${cleanBills.length} 条有效记录`);
+    }
+
+    if (cleanBills.length === 0) {
+      return Response.json(
+        {
+          error: '数据验证失败',
+          message: '未找到有效的账单记录，请检查文件格式',
+        },
+        { status: 400 }
+      );
+    }
+
+    // 6. 生成上传 ID
     const uploadId = `upload-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
-    // 3. 保存原始文件到 R2
+    // 7. 保存原始文件到 R2
     const rawKey = await saveRawFile(bucket, uploadId, file);
 
-    // 4. 生成 beancount 内容
-    const result = await convertBillsToBeancount(bills, { sourceType: fileType as any });
+    // 8. 生成 beancount 内容
+    const result = await convertBillsToBeancount(cleanBills, { sourceType: fileType as any });
 
-    // 5. 保存 bean 文件到 R2
+    // 9. 保存 bean 文件到 R2
     const beanKey = await saveBeanFile(bucket, uploadId, result.beancountContent);
 
-    // 6. 计算总金额
-    const totalAmount = bills.reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
+    // 10. 计算总金额
+    const totalAmount = cleanBills.reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
 
-    // 7. 保存元数据到 D1
+    // 11. 保存元数据到 D1
     await saveUpload(db, {
       id: uploadId,
       original_filename: file.name,
@@ -59,16 +111,21 @@ export async function action(args: any) {
       upload_date: new Date().toISOString().split('T')[0],
       raw_file_key: rawKey,
       bean_file_key: beanKey,
-      transaction_count: bills.length,
+      transaction_count: cleanBills.length,
       total_amount: totalAmount,
-      parsed_data: bills,
+      parsed_data: cleanBills,
     });
 
-    // 8. 返回上传记录 ID 和 bean 内容
+    // 12. 返回上传记录 ID 和 bean 内容
     return Response.json({
       uploadId,
       success: true,
       beancountContent: result.beancountContent,
+      stats: {
+        totalRecords: bills.length,
+        validRecords: cleanBills.length,
+        invalidRecords: invalid,
+      },
     });
   } catch (error) {
     console.error('Upload error:', error);

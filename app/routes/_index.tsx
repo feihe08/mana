@@ -237,8 +237,9 @@ export default function ConvertTool() {
         {/* 错误提示 */}
         {error && (
           <div className="max-w-6xl mx-auto mb-6">
-            <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-4 text-red-400">
-              {error}
+            <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-4">
+              <div className="text-red-400 font-semibold mb-2">⚠️ {error}</div>
+              <div className="text-sm text-red-300/80 whitespace-pre-wrap">{error}</div>
             </div>
           </div>
         )}
