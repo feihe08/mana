@@ -192,6 +192,7 @@ export function meta() { // ❌ 缺少参数
 ## 📝 开发日志
 
 ### 2025-01-25
+- ✅ **项目定位调整**：从"账单分析平台"转向"Beancount 文件生成器 + 核心简洁分析"
 - ✅ 实现账单历史列表页面（app/routes/bills.tsx）
   - 使用 localStorage 存储（最多30条记录）
   - 支持按名称搜索
@@ -202,6 +203,13 @@ export function meta() { // ❌ 缺少参数
 - ✅ 转换完成后自动保存账单记录
 - ✅ 发现并修复路由配置问题（需在 app/routes.ts 中显式配置）
 - ✅ 文档规范更新：重命名 REVIEW.md 为 PLAN.md
+- ⚠️ **架构升级开始**：从 localStorage 迁移到 Cloudflare D1 + R2
+  - ✅ 创建项目级 `.claude` 目录并移动计划文件
+  - ✅ 创建 D1 数据库（database_id: fd67e0ee-85da-42b2-aa1b-c3f3f101100f）
+  - ✅ 更新 wrangler.toml 配置
+  - ✅ 重构 schema.sql（新 uploads 表替代原 bills 表）
+  - ✅ 本地和生产环境数据库表创建成功
+  - ⏳ 等待用户在 Dashboard 启用 R2
 - ⚠️ 明确不需要统计分析页面（使用 Fava 查看 bean 文件即可）
 
 ### 2025-01-16
