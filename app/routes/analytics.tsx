@@ -11,6 +11,7 @@ import { getUserSettings } from '../lib/db/settings';
 import {
   calculateSummary,
   aggregateByCategory,
+  aggregateByMonth,
   extractTransactions,
   type Transaction,
 } from '../lib/analytics';
@@ -26,6 +27,9 @@ import {
 } from '../lib/analyzers/anomaly';
 import { StatsCards } from '../components/analytics/StatsCards';
 import { CategoryList } from '../components/analytics/CategoryList';
+import CategoryPieChart from '../components/analytics/CategoryPieChart';
+import TrendLineChart from '../components/analytics/TrendLineChart';
+import MonthlyBarChart from '../components/analytics/MonthlyBarChart';
 import { BudgetProgress } from '../components/analytics/BudgetProgress';
 import { AnomalyAlert } from '../components/analytics/AnomalyAlert';
 import { DateRangeFilter } from '../components/analytics/DateRangeFilter';
@@ -142,6 +146,14 @@ export default function AnalyticsPage() {
     return detectAnomalousBills(filteredTransactions, categoryStatsMap);
   }, [filteredTransactions]);
 
+  // 计算月度趋势数据（使用所有交易，不受时间筛选影响）
+  const monthlyData = useMemo(() => {
+    if (!transactions || transactions.length === 0) {
+      return [];
+    }
+    return aggregateByMonth(transactions, 12); // 最近12个月
+  }, [transactions]);
+
   // 如果没有数据
   if (!transactions || transactions.length === 0) {
     return (
@@ -211,24 +223,46 @@ export default function AnalyticsPage() {
           </div>
         )}
 
-        {/* 两列布局 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* 左列 */}
-          <div className="space-y-6">
-            {/* 分类统计 */}
+        {/* 图表区域 */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-white mb-6">📊 可视化分析</h2>
+
+          {/* 第一行：饼图 + 折线图 */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            {/* 饼图 */}
             {categoryStats.length > 0 && (
-              <CategoryList categories={categoryStats} />
+              <CategoryPieChart categories={categoryStats} maxItems={8} />
+            )}
+
+            {/* 折线图 */}
+            {monthlyData.length > 0 && (
+              <TrendLineChart monthlyData={monthlyData} months={6} />
             )}
           </div>
 
-          {/* 右列 */}
-          <div className="space-y-6">
-            {/* 预算对比 */}
-            <BudgetProgress budgets={budgetComparisons} maxItems={5} />
+          {/* 第二行：柱状图 */}
+          {monthlyData.length > 0 && (
+            <div className="mb-6">
+              <MonthlyBarChart monthlyData={monthlyData} months={6} />
+            </div>
+          )}
+        </div>
 
-            {/* 异常检测 */}
-            <AnomalyAlert anomalies={anomalies} />
+        {/* 分类列表详情 */}
+        {categoryStats.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-white mb-6">🏷️ 分类详情</h2>
+            <CategoryList categories={categoryStats} />
           </div>
+        )}
+
+        {/* 两列布局：预算 + 异常 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* 预算对比 */}
+          <BudgetProgress budgets={budgetComparisons} maxItems={5} />
+
+          {/* 异常检测 */}
+          <AnomalyAlert anomalies={anomalies} />
         </div>
 
         {/* 底部提示 */}
