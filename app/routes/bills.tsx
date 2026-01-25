@@ -175,10 +175,13 @@ export default function BillsList() {
                   <div className="flex gap-3">
                     <a
                       href={`/api/download?id=${upload.id}`}
-                      download={`${upload.original_filename}.bean`}
-                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm transition-colors"
+                      download={`${upload.original_filename.replace(/\.[^/.]+$/, '')}.bean`}
+                      className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm transition-colors flex items-center gap-2"
                     >
-                      下载
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      下载 Beancount
                     </a>
                     <Form method="post" action="/api/delete-upload">
                       <input type="hidden" name="id" value={upload.id} />
