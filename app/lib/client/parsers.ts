@@ -159,27 +159,48 @@ async function categorizeByAI(
 ): Promise<Map<string, string>> {
   console.log('🤖 [categorizeByAI] 使用 AI 分类', bills.length, '条未分类账单');
 
-  // 批量调用 AI API
-  const request = await fetch('/api/batch-categorize', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ bills }),
-  });
+  try {
+    // 批量调用 AI API
+    const request = await fetch('/api/batch-categorize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bills }),
+    });
 
-  if (!request.ok) {
-    console.error('❌ [categorizeByAI] AI 请求失败:', request.statusText);
+    if (!request.ok) {
+      // 尝试读取错误响应
+      let errorMsg = request.statusText;
+      try {
+        const errorData = await request.json();
+        errorMsg = errorData.error || errorMsg;
+      } catch (e) {
+        // 无法解析错误响应，使用 statusText
+      }
+
+      console.error('❌ [categorizeByAI] AI 请求失败:', request.status, errorMsg);
+      return new Map();
+    }
+
+    const result = await request.json();
+
+    // 验证响应格式
+    if (!result.categories || !Array.isArray(result.categories)) {
+      console.error('❌ [categorizeByAI] AI 响应格式错误:', result);
+      return new Map();
+    }
+
+    const categoryMap = new Map<string, string>();
+
+    result.categories.forEach((item: { description: string; category: string }) => {
+      categoryMap.set(item.description, item.category);
+    });
+
+    console.log(`✅ [categorizeByAI] AI 分类完成，成功分类 ${categoryMap.size} 条`);
+    return categoryMap;
+  } catch (error) {
+    console.error('❌ [categorizeByAI] AI 请求异常:', error);
     return new Map();
   }
-
-  const result = await request.json();
-  const categoryMap = new Map<string, string>();
-
-  result.categories.forEach((item: { description: string; category: string }) => {
-    categoryMap.set(item.description, item.category);
-  });
-
-  console.log('✅ [categorizeByAI] AI 分类完成');
-  return categoryMap;
 }
 
 /**
