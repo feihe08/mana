@@ -89,9 +89,17 @@ export default function BillsList() {
       <div className="relative container mx-auto px-4 py-8">
         {/* 标题 */}
         <div className="mb-8">
-          <Link to="/" className="text-purple-400 hover:text-purple-300 inline-block mb-4">
-            ← 返回首页
-          </Link>
+          <div className="flex justify-between items-center mb-4">
+            <Link to="/" className="text-purple-400 hover:text-purple-300">
+              ← 返回首页
+            </Link>
+            <Link
+              to="/settings"
+              className="text-purple-400 hover:text-purple-300 text-sm flex items-center gap-2"
+            >
+              ⚙️ 设置
+            </Link>
+          </div>
           <h1 className="text-3xl font-bold text-white mb-2">账单历史</h1>
           <p className="text-gray-400">
             {uploads.length} 条记录，

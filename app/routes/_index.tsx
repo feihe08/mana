@@ -211,6 +211,13 @@ export default function ConvertTool() {
             >
               📊 查看账单历史
             </Link>
+            <span className="text-gray-600">|</span>
+            <Link
+              to="/settings"
+              className="text-purple-400 hover:text-purple-300 text-sm flex items-center gap-2"
+            >
+              ⚙️ 设置
+            </Link>
           </div>
           <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-gray-800/50 border border-gray-700/50 backdrop-blur-sm mb-4">
             <div className="w-2 h-2 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 animate-pulse" />

@@ -19,6 +19,17 @@ CREATE TABLE IF NOT EXISTS uploads (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- 用户设置表
+CREATE TABLE IF NOT EXISTS user_settings (
+  user_id TEXT PRIMARY KEY,
+  -- JSON 格式存储设置
+  custom_rules TEXT NOT NULL DEFAULT '[]',  -- JSON array
+  budgets TEXT NOT NULL DEFAULT '[]',        -- JSON array
+  ai_enabled INTEGER NOT NULL DEFAULT 1,     -- 0 or 1
+  default_category TEXT NOT NULL DEFAULT 'Shopping-Daily',
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- 索引优化
 CREATE INDEX IF NOT EXISTS idx_uploads_date ON uploads(upload_date);
 CREATE INDEX IF NOT EXISTS idx_uploads_type ON uploads(file_type);

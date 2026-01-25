@@ -17,7 +17,7 @@ export interface BillStats {
 }
 
 // 检测单笔异常支出
-export async function detectAnomalousBills(
+export function detectAnomalousBills(
   bills: Array<{
     id: string;
     amount: number;
@@ -25,7 +25,7 @@ export async function detectAnomalousBills(
   }>,
   stats: Map<string, BillStats>,
   threshold = 3 // 标准差倍数
-): Promise<Anomaly[]> {
+): Anomaly[] {
   const anomalies: Anomaly[] = [];
 
   for (const bill of bills) {
