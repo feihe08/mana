@@ -164,7 +164,7 @@ npx tsc --noEmit
 
 ### 单元测试
 ```bash
-node test-validation-logic.cjs
+node tests/test-validation-logic.cjs
 ```
 
 结果：✅ 28/28 测试通过
