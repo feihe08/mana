@@ -25,18 +25,18 @@
 3. 不确定时，先询问用户："已完成 X，是否继续 Y？"
 
 **文档更新要求**：
-- ⚠️ **每次完成开发任务后，必须更新 `PLAN.md`**
+- ⚠️ **每次完成开发任务后，必须更新 `docs/PLAN.md`**
   - 标记已完成的任务
   - 更新进度追踪
   - 添加新的开发日志
-- ⚠️ **项目规划调整时，必须更新 `PLAN.md`**
+- ⚠️ **项目规划调整时，必须更新 `docs/PLAN.md`**
   - 修改任务优先级
   - 添加或删除任务
   - 更新预计时间
 
 **代码提交要求**：
 - ✅ **每次完成开发任务后，必须提交代码**
-  - 更新相关 md 文档（PLAN.md 等）
+  - 更新相关 md 文档（docs/PLAN.md 等）
   - `git add` 修改的文件
   - 使用规范的 commit message
   - 执行 `git commit` 提交
@@ -162,14 +162,16 @@ mana/
 │   ├── entry.client.tsx     # 客户端入口
 │   ├── entry.server.tsx     # 服务端入口
 │   └── styles.css           # 全局样式
+├── docs/                    # 项目文档
+│   ├── QUICKSTART.md        # 快速开始
+│   ├── PLAN.md              # 项目规划和进度
+│   └── ...                  # 其他文档
 ├── public/                  # 静态资源
 ├── wrangler.toml            # Cloudflare 配置
 ├── vite.config.ts           # Vite 配置
 ├── tsconfig.json            # TypeScript 配置
 ├── package.json
 ├── README.md                # 项目说明
-├── QUICKSTART.md            # 快速开始
-├── REVIEW.md                # 项目总结和 TODO
 └── CLAUDE.md                # 本文件
 ```
 
@@ -401,7 +403,7 @@ export async function parseXXX(file: File): Promise<ParsedBill[]>
 5. **错误处理完善** - 增强解析器和文件上传的错误处理
 6. **用户体验优化** - 添加加载动画、错误提示等
 
-详细任务列表见: `REVIEW.md`
+详细任务列表见: `docs/PLAN.md`
 
 ---
 
@@ -422,7 +424,7 @@ export async function parseXXX(file: File): Promise<ParsedBill[]>
 8. 安全加固
 9. 性能优化
 
-完整 TODO 见: `REVIEW.md#任务清单`
+完整 TODO 见: `docs/PLAN.md#任务清单`
 
 ---
 
@@ -484,8 +486,8 @@ pnpm dev  # 启动开发服务器（需要先配置 wrangler）
 
 ### 项目文档
 - `README.md` - 项目说明和快速开始
-- `QUICKSTART.md` - 详细开发指南
-- `REVIEW.md` - 项目总结、问题分析和 TODO 清单
+- `docs/QUICKSTART.md` - 详细开发指南
+- `docs/PLAN.md` - 项目规划、问题分析和 TODO 清单
 
 ---
 
