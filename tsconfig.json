@@ -23,7 +23,8 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
-      "~/*": ["./app/*"]
+      "~/*": ["./app/*"],
+      "./+types/*": ["./.react-router/types/app/routes/+types/*"]
     }
   }
 }

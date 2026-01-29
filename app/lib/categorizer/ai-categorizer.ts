@@ -10,7 +10,7 @@ import { getCategoryRules } from "../beancount/default-accounts";
 /**
  * AI 分类请求
  */
-interface AICategorizeRequest {
+export interface AICategorizeRequest {
   description: string;
   amount: number;
   availableAccounts: string[];
@@ -19,7 +19,7 @@ interface AICategorizeRequest {
 /**
  * AI 分类响应
  */
-interface AICategorizeResponse {
+export interface AICategorizeResponse {
   account: string;
   confidence: number;
   reasoning?: string;
@@ -74,7 +74,7 @@ export class AICategorizer {
         throw new Error(`AI API 请求失败: ${response.statusText}`);
       }
 
-      const result = await response.json();
+      const result = await response.json() as AICategorizeResponse;
 
       return {
         account: result.account || this.fallbackAccount,

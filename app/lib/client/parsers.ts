@@ -40,7 +40,7 @@ async function fetchUserRules(): Promise<CategoryRule[]> {
       return getCategoryRules();
     }
 
-    const data = await response.json();
+    const data = await response.json() as { allRules?: CategoryRule[] };
 
     // 将字符串 pattern 转换回 RegExp 对象
     const rules = (data.allRules || getCategoryRules()).map((rule: any) => ({
@@ -171,7 +171,7 @@ async function categorizeByAI(
       // 尝试读取错误响应
       let errorMsg = request.statusText;
       try {
-        const errorData = await request.json();
+        const errorData = await request.json() as { error?: string };
         errorMsg = errorData.error || errorMsg;
       } catch (e) {
         // 无法解析错误响应，使用 statusText
@@ -181,7 +181,7 @@ async function categorizeByAI(
       return new Map();
     }
 
-    const result = await request.json();
+    const result = await request.json() as { categories?: Array<{ description: string; category: string }> };
 
     // 验证响应格式
     if (!result.categories || !Array.isArray(result.categories)) {

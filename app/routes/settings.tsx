@@ -79,7 +79,7 @@ export default function SettingsPage() {
     setIsLoading(true);
     try {
       const response = await fetch('/api/settings');
-      const data = await response.json();
+      const data = await response.json() as SettingsData;
       setSettings(data);
     } catch (error) {
       console.error('加载设置失败:', error);
@@ -495,7 +495,7 @@ export default function SettingsPage() {
                                     默认
                                   </span>
                                 )}
-                                {rule.priority > 10 && (
+                                {rule.priority && rule.priority > 10 && (
                                   <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 rounded text-xs">
                                     优先级 {rule.priority}
                                   </span>

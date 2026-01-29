@@ -24,15 +24,7 @@ const gitInfo = getGitInfo();
 
 export default defineConfig({
   plugins: [
-    reactRouter({
-      // 配置 Cloudflare 适配器
-      cloudflare: {
-        // 在开发模式下使用 wrangler 代理
-        devProxy: {
-          enabled: true,
-        },
-      },
-    }),
+    reactRouter(),
     tsconfigPaths(),
     tailwindcss(),
   ],

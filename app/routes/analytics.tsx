@@ -8,6 +8,7 @@ import { Link, useLoaderData } from 'react-router';
 import { getDB } from '../lib/server';
 import { getUploads } from '../lib/db/uploads';
 import { getUserSettings } from '../lib/db/settings';
+import type { StandardCategory } from '../lib/beancount/category-taxonomy';
 import {
   calculateSummary,
   aggregateByCategory,
@@ -133,7 +134,10 @@ export default function AnalyticsPage() {
     if (!filteredTransactions || filteredTransactions.length === 0 || !budgets) {
       return [];
     }
-    return compareWithBudget(filteredTransactions, budgets);
+    return compareWithBudget(filteredTransactions, budgets.map(b => ({
+      ...b,
+      category: b.category as StandardCategory
+    })));
   }, [filteredTransactions, budgets]);
 
   const anomalies = useMemo(() => {

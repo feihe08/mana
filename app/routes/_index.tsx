@@ -262,7 +262,10 @@ export default function ConvertTool() {
 
           {currentStep === 2 && (
             <Step2Preview
-              bills={categorizedBills.filter((b) => !deletedBillIds.has(b.id))}
+              bills={categorizedBills.filter((b) => !deletedBillIds.has(b.id)).map(b => ({
+                ...b,
+                date: b.transactionDate
+              }))}
               anomalies={anomalies}
               selectedIds={selectedBillIds}
               onToggleSelect={handleToggleSelect}

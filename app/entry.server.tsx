@@ -2,7 +2,7 @@ import { isbot } from "isbot";
 import { renderToReadableStream } from "react-dom/server";
 import type {
   EntryContext,
-  unstable_RouterContextProvider,
+  RouterContextProvider,
 } from "react-router";
 import { ServerRouter } from "react-router";
 
@@ -11,7 +11,7 @@ export default async function handleRequest(
   responseStatusCode: number,
   responseHeaders: Headers,
   entryContext: EntryContext,
-  _routerContext: unstable_RouterContextProvider
+  _routerContext: RouterContextProvider
 ) {
   let shellRendered = false;
   const userAgent = request.headers.get("user-agent");

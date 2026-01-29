@@ -4,17 +4,18 @@
  */
 
 import { createRequestHandler } from "@react-router/cloudflare";
+import type { ServerBuild } from "react-router";
 
 // 创建 React Router 请求处理器
 const requestHandler = createRequestHandler({
-  build: () => import("../build/server/index.js"),
+  build: () => import("../build/server/index.js") as unknown as Promise<ServerBuild>,
   mode: "production",
 });
 
 /**
  * 构建给 AI 的提示词 - 用于列识别
  */
-function buildPrompt(headers, source) {
+function buildPrompt(headers: string[], source: string) {
   return `你是一个账单解析专家。请分析以下 CSV 表头，识别关键列的索引位置。
 
 来源：${source}
@@ -43,7 +44,7 @@ function buildPrompt(headers, source) {
 /**
  * 构建给 AI 的提示词 - 用于交易分类
  */
-function buildCategorizePrompt(description, amount, availableAccounts) {
+function buildCategorizePrompt(description: string, amount: number, availableAccounts: string[]) {
   return `你是一个财务专家。请根据交易描述选择最合适的 Beancount 账户。
 
 交易描述：${description}
@@ -51,7 +52,7 @@ function buildCategorizePrompt(description, amount, availableAccounts) {
 ${amount < 0 ? '类型：支出（费用账户）' : '类型：收入（收入账户）'}
 
 可用账户列表：
-${availableAccounts.map((acc, i) => `${i + 1}. ${acc}`).join('\n')}
+${availableAccounts.map((acc: string, i: number) => `${i + 1}. ${acc}`).join('\n')}
 
 请返回 JSON 格式：
 {
@@ -70,7 +71,7 @@ ${availableAccounts.map((acc, i) => `${i + 1}. ${acc}`).join('\n')}
 /**
  * 解析 AI 响应为 JSON
  */
-function parseAIResponse(responseText) {
+function parseAIResponse(responseText: string) {
   const jsonMatch = responseText.match(/\{[\s\S]*\}/);
 
   if (!jsonMatch) {
@@ -87,7 +88,7 @@ function parseAIResponse(responseText) {
 }
 
 export default {
-  async fetch(request, env, ctx) {
+  async fetch(request: Request, env: any, ctx: any) {
     const url = new URL(request.url);
 
     // 优先处理静态资产请求
@@ -117,7 +118,7 @@ export default {
     // 处理 AI 列识别请求
     if (url.pathname === '/api/recognize-columns' && request.method === 'POST') {
       try {
-        const body = await request.json();
+        const body = await request.json() as { headers: string[]; source: string };
         const { headers, source } = body;
 
         if (!env.AI) {
@@ -162,7 +163,7 @@ export default {
     // 处理 AI 交易分类请求
     if (url.pathname === '/api/categorize' && request.method === 'POST') {
       try {
-        const body = await request.json();
+        const body = await request.json() as { description: string; amount: number; availableAccounts?: string[] };
         const { description, amount, availableAccounts } = body;
 
         if (!env.AI) {
@@ -227,7 +228,7 @@ export default {
     // 处理批量 AI 交易分类请求
     if (url.pathname === '/api/batch-categorize' && request.method === 'POST') {
       try {
-        const body = await request.json();
+        const body = await request.json() as { bills: Array<{ description: string; amount: number }> };
         const { bills } = body;
 
         if (!env.AI) {
@@ -338,9 +339,13 @@ ${bills.map((b, i) => `${i + 1}. "${b.description}" (${Math.abs(b.amount)}元)`)
         env,
         waitUntil: ctx?.waitUntil?.bind(ctx) || (() => {}),
         passThroughOnException: ctx?.passThroughOnException?.bind(ctx) || (() => {}),
+        functionPath: "",
+        next: () => {},
+        params: {},
+        data: {},
       };
 
-      const response = await requestHandler(cloudflareContext);
+      const response = await requestHandler(cloudflareContext as any);
       console.log('Response status:', response.status);
       return response;
     } catch (error) {

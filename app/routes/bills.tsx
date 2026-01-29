@@ -66,11 +66,11 @@ export default function BillsList() {
   };
 
   // 从 parsed_data 中提取分类统计
-  const getCategoryStats = (upload: Upload) => {
+  const getCategoryStats = (upload: Upload): Record<string, number> => {
     try {
-      const bills = JSON.parse(upload.parsed_data || '[]');
-      return bills.reduce((acc: Record<string, number>, b: any) => {
-        const category = (b as any).category || '未分类';
+      const bills = JSON.parse(upload.parsed_data || '[]') as Array<{ category?: string }>;
+      return bills.reduce((acc: Record<string, number>, b) => {
+        const category = b.category || '未分类';
         acc[category] = (acc[category] || 0) + 1;
         return acc;
       }, {} as Record<string, number>);
@@ -166,7 +166,7 @@ export default function BillsList() {
                     <p className="text-sm text-gray-400 mb-2">分类分布：</p>
                     <div className="flex flex-wrap gap-2">
                       {Object.entries(categoryStats)
-                        .sort(([, a], [, b]) => b - a)
+                        .sort(([, a]: [string, number], [, b]: [string, number]) => b - a)
                         .slice(0, 5)
                         .map(([category, count]) => (
                           <span
