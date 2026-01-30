@@ -15,6 +15,10 @@ import {
   aggregateByMonth,
   extractTransactions,
   type Transaction,
+  calculateNetWorth,
+  calculateCategoryChanges,
+  calculateFinancialHealthScore,
+  generateExpenseSuggestions,
 } from '../lib/analytics';
 import {
   compareWithBudget,
@@ -31,7 +35,11 @@ import { CategoryList } from '../components/analytics/CategoryList';
 import CategoryPieChart from '../components/analytics/CategoryPieChart';
 import TrendLineChart from '../components/analytics/TrendLineChart';
 import MonthlyBarChart from '../components/analytics/MonthlyBarChart';
-import FinancialOverview from '../components/analytics/FinancialOverview';
+import InsightCard from '../components/analytics/InsightCard';
+import NetWorthTracker from '../components/analytics/NetWorthTracker';
+import CategoryComparison from '../components/analytics/CategoryComparison';
+import FinancialHealthScore from '../components/analytics/FinancialHealthScore';
+import ExpenseSuggestions from '../components/analytics/ExpenseSuggestions';
 import { BudgetProgress } from '../components/analytics/BudgetProgress';
 import { AnomalyAlert } from '../components/analytics/AnomalyAlert';
 import { DateRangeFilter } from '../components/analytics/DateRangeFilter';
@@ -160,6 +168,35 @@ export default function AnalyticsPage() {
     return aggregateByMonth(transactions, 12); // 最近12个月
   }, [transactions]);
 
+  // 计算新增的分析数据
+  const netWorthStats = useMemo(() => {
+    if (!transactions || transactions.length === 0) {
+      return null;
+    }
+    return calculateNetWorth(transactions);
+  }, [transactions]);
+
+  const categoryChanges = useMemo(() => {
+    if (!transactions || transactions.length === 0) {
+      return [];
+    }
+    return calculateCategoryChanges(transactions);
+  }, [transactions]);
+
+  const financialHealthScore = useMemo(() => {
+    if (!transactions || transactions.length === 0) {
+      return null;
+    }
+    return calculateFinancialHealthScore(transactions, budgets);
+  }, [transactions, budgets]);
+
+  const expenseSuggestions = useMemo(() => {
+    if (!transactions || transactions.length === 0) {
+      return [];
+    }
+    return generateExpenseSuggestions(transactions, budgets);
+  }, [transactions, budgets]);
+
   // 如果没有数据
   if (!transactions || transactions.length === 0) {
     return (
@@ -222,16 +259,28 @@ export default function AnalyticsPage() {
           />
         </div>
 
-        {/* 财务概览 - 一目了然 */}
-        {summary && (
+        {/* 核心洞察 */}
+        <div className="mb-8">
+          <InsightCard transactions={transactions} />
+        </div>
+
+        {/* 净资产追踪 + 财务健康评分 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {netWorthStats && (
+            <NetWorthTracker stats={netWorthStats} />
+          )}
+
+          {financialHealthScore && (
+            <FinancialHealthScore score={financialHealthScore} />
+          )}
+        </div>
+
+        {/* 分类对比分析 */}
+        {categoryChanges.length > 0 && (
           <div className="mb-8">
-            <FinancialOverview
-              totalExpenses={summary.totalExpenses}
-              totalIncome={summary.totalIncome}
-              netSavings={summary.netSavings}
-              expensesVsLastMonth={summary.expensesVsLastMonth}
-              incomeVsLastMonth={summary.incomeVsLastMonth}
-              savingsVsLastMonth={summary.savingsVsLastMonth}
+            <CategoryComparison
+              comparisons={categoryChanges}
+              maxItems={5}
             />
           </div>
         )}
@@ -256,13 +305,20 @@ export default function AnalyticsPage() {
         </div>
 
         {/* 两列布局：预算 + 异常 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* 预算对比 */}
           <BudgetProgress budgets={budgetComparisons} maxItems={5} />
 
           {/* 异常检测 */}
           <AnomalyAlert anomalies={anomalies} />
         </div>
+
+        {/* 支出建议 */}
+        {expenseSuggestions.length > 0 && (
+          <div className="mb-8">
+            <ExpenseSuggestions suggestions={expenseSuggestions} />
+          </div>
+        )}
 
         {/* 底部提示 */}
         <div className="mt-8 p-4 bg-gray-800/50 rounded-lg border border-gray-700 text-center">
