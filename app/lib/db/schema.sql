@@ -5,6 +5,9 @@ CREATE TABLE IF NOT EXISTS uploads (
   file_type TEXT NOT NULL, -- 'alipay', 'wechat', 'csv', 'excel'
   upload_date TEXT NOT NULL,
 
+  -- 文件哈希（用于去重）
+  file_hash TEXT,
+
   -- R2 文件路径
   raw_file_key TEXT NOT NULL,
   bean_file_key TEXT NOT NULL,
@@ -33,3 +36,4 @@ CREATE TABLE IF NOT EXISTS user_settings (
 -- 索引优化
 CREATE INDEX IF NOT EXISTS idx_uploads_date ON uploads(upload_date);
 CREATE INDEX IF NOT EXISTS idx_uploads_type ON uploads(file_type);
+CREATE INDEX IF NOT EXISTS idx_uploads_file_hash ON uploads(file_hash);

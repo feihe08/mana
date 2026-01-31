@@ -11,6 +11,7 @@ export interface Upload {
   original_filename: string;
   file_type: 'alipay' | 'wechat' | 'csv' | 'excel';
   upload_date: string;
+  file_hash: string | null; // 文件哈希（用于去重）
   raw_file_key: string;
   bean_file_key: string;
   transaction_count: number;
@@ -24,6 +25,7 @@ export interface UploadData {
   original_filename: string;
   file_type: 'alipay' | 'wechat' | 'csv' | 'excel';
   upload_date: string;
+  file_hash?: string; // 文件哈希（可选）
   raw_file_key: string;
   bean_file_key: string;
   transaction_count: number;
@@ -59,9 +61,9 @@ export async function saveUpload(
   const stmt = db.prepare(`
     INSERT INTO uploads (
       id, original_filename, file_type, upload_date,
-      raw_file_key, bean_file_key,
+      file_hash, raw_file_key, bean_file_key,
       transaction_count, total_amount, parsed_data
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const parsedDataJson = JSON.stringify(data.parsed_data);
@@ -71,6 +73,7 @@ export async function saveUpload(
     data.original_filename,
     data.file_type,
     data.upload_date,
+    data.file_hash || null,
     data.raw_file_key,
     data.bean_file_key,
     data.transaction_count,
@@ -190,27 +193,4 @@ export async function getUploadStats(
     total_amount,
     by_type,
   };
-}
-
-/**
- * 获取所有历史交易记录（用于去重）
- * @param db D1 数据库实例
- * @returns 所有历史交易记录的数组
- */
-export async function getAllTransactions(db: D1Database): Promise<any[]> {
-  const uploads = await getUploads(db);
-  const allTransactions: any[] = [];
-
-  for (const upload of uploads) {
-    try {
-      const parsedData = JSON.parse(upload.parsed_data);
-      if (Array.isArray(parsedData)) {
-        allTransactions.push(...parsedData);
-      }
-    } catch (error) {
-      console.error(`Failed to parse data for upload ${upload.id}:`, error);
-    }
-  }
-
-  return allTransactions;
 }
