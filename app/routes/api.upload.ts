@@ -4,11 +4,12 @@
  */
 
 import { getDB, getBucket } from '../lib/server';
-import { saveUpload } from '../lib/db/uploads';
+import { saveUpload, getAllTransactions } from '../lib/db/uploads';
 import { saveRawFile, saveBeanFile } from '../lib/storage/files';
 import { convertBillsToBeancount } from '../lib/pipeline/conversion-pipeline';
 import { validateFile, formatValidationError } from '../lib/utils/file-validation';
 import { validateBills, formatValidationErrors, sanitizeBills } from '../lib/utils/data-validation';
+import { deduplicateBills, generateDeduplicationReport } from '../lib/utils/deduplication';
 
 export async function action(args: any) {
   try {
@@ -88,22 +89,49 @@ export async function action(args: any) {
       );
     }
 
-    // 6. 生成上传 ID
+    // 6. 去重：与历史记录对比
+    console.log('🔍 开始去重检查...');
+    const existingTransactions = await getAllTransactions(db);
+    console.log(`📊 历史记录数量: ${existingTransactions.length}`);
+
+    const deduplicationResult = deduplicateBills(cleanBills, existingTransactions);
+    const deduplicationReport = generateDeduplicationReport(deduplicationResult);
+
+    console.log(`✅ 唯一记录: ${deduplicationResult.uniqueCount}`);
+    console.log(`⚠️ 重复记录: ${deduplicationResult.duplicateCount}`);
+    console.log(`📈 重复率: ${deduplicationReport.duplicateRate}%`);
+
+    // 如果所有记录都是重复的，返回提示
+    if (deduplicationResult.uniqueCount === 0) {
+      return Response.json(
+        {
+          error: '所有记录都是重复的',
+          message: '上传的账单中所有交易记录都已存在，未发现新的交易',
+          deduplication: deduplicationReport,
+        },
+        { status: 400 }
+      );
+    }
+
+    // 使用去重后的唯一记录
+    const uniqueBills = deduplicationResult.unique;
+
+    // 7. 生成上传 ID
     const uploadId = `upload-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
-    // 7. 保存原始文件到 R2
+    // 8. 保存原始文件到 R2
     const rawKey = await saveRawFile(bucket, uploadId, file);
 
-    // 8. 生成 beancount 内容
-    const result = await convertBillsToBeancount(cleanBills, { sourceType: fileType as any });
+    // 9. 生成 beancount 内容（使用去重后的记录）
+    const result = await convertBillsToBeancount(uniqueBills, { sourceType: fileType as any });
 
-    // 9. 保存 bean 文件到 R2
+    // 10. 保存 bean 文件到 R2
     const beanKey = await saveBeanFile(bucket, uploadId, result.beancountContent);
 
-    // 10. 计算总金额
-    const totalAmount = cleanBills.reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
+    // 11. 计算总金额（使用去重后的记录）
+    const totalAmount = uniqueBills.reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
 
-    // 11. 保存元数据到 D1
+    // 12. 保存元数据到 D1（使用去重后的记录）
     await saveUpload(db, {
       id: uploadId,
       original_filename: file.name,
@@ -111,12 +139,12 @@ export async function action(args: any) {
       upload_date: new Date().toISOString().split('T')[0],
       raw_file_key: rawKey,
       bean_file_key: beanKey,
-      transaction_count: cleanBills.length,
+      transaction_count: uniqueBills.length,
       total_amount: totalAmount,
-      parsed_data: cleanBills,
+      parsed_data: uniqueBills,
     });
 
-    // 12. 返回上传记录 ID 和 bean 内容
+    // 13. 返回上传记录 ID、bean 内容和去重统计
     return Response.json({
       uploadId,
       success: true,
@@ -125,7 +153,10 @@ export async function action(args: any) {
         totalRecords: bills.length,
         validRecords: cleanBills.length,
         invalidRecords: invalid,
+        uniqueRecords: uniqueBills.length,
+        duplicateRecords: deduplicationResult.duplicateCount,
       },
+      deduplication: deduplicationReport,
     });
   } catch (error) {
     console.error('Upload error:', error);

@@ -191,3 +191,26 @@ export async function getUploadStats(
     by_type,
   };
 }
+
+/**
+ * 获取所有历史交易记录（用于去重）
+ * @param db D1 数据库实例
+ * @returns 所有历史交易记录的数组
+ */
+export async function getAllTransactions(db: D1Database): Promise<any[]> {
+  const uploads = await getUploads(db);
+  const allTransactions: any[] = [];
+
+  for (const upload of uploads) {
+    try {
+      const parsedData = JSON.parse(upload.parsed_data);
+      if (Array.isArray(parsedData)) {
+        allTransactions.push(...parsedData);
+      }
+    } catch (error) {
+      console.error(`Failed to parse data for upload ${upload.id}:`, error);
+    }
+  }
+
+  return allTransactions;
+}
