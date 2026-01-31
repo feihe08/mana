@@ -297,7 +297,7 @@ ${bills.map((b, i) => `${i + 1}. "${b.description}" (${Math.abs(b.amount)}元)`)
               role: 'user',
               content: prompt,
             }],
-            max_tokens: 4096,
+            max_tokens: 16384, // 增加到 16384 以支持更多账单的批量分类
           }
         );
 
