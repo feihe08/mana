@@ -51,7 +51,7 @@ export function Step1Upload({
       const fileHash = await calculateFileHash(file);
 
       // 调用 API 检查是否重复
-      const response = await fetch('/api/check-duplicate', {
+      const response = await fetch('/api/check_duplicate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileHash }),
