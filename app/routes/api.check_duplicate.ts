@@ -1,11 +1,11 @@
 /**
  * 检查文件是否重复 API
- * POST /api/check-duplicate
+ * POST /api/check_duplicate
  *
  * 接收文件哈希，返回是否重复
  */
 
-import type { Route } from './+types/api.check-duplicate';
+import type { Route } from './+types/api.check_duplicate';
 import { getDB } from '../lib/server';
 import { checkFileDuplicate } from '../lib/utils/file-hash';
 
