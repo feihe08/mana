@@ -225,6 +225,58 @@ export default {
       }
     }
 
+    // 处理文件重复检查请求
+    if (url.pathname === '/api/check-duplicate' && request.method === 'POST') {
+      try {
+        const body = await request.json() as { fileHash: string };
+        const { fileHash } = body;
+
+        if (!fileHash) {
+          return new Response(JSON.stringify({
+            error: '缺少必要参数：fileHash'
+          }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        // 检查文件是否已存在
+        const stmt = env.DB.prepare('SELECT * FROM uploads WHERE file_hash = ?');
+        const duplicate = await stmt.bind(fileHash).first();
+
+        if (duplicate) {
+          return new Response(JSON.stringify({
+            isDuplicate: true,
+            existingUpload: {
+              id: duplicate.id,
+              filename: duplicate.original_filename,
+              uploadDate: duplicate.upload_date,
+              transactionCount: duplicate.transaction_count,
+              totalAmount: duplicate.total_amount,
+            },
+          }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        return new Response(JSON.stringify({
+          isDuplicate: false,
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      } catch (error) {
+        console.error('Check duplicate error:', error);
+        return new Response(JSON.stringify({
+          error: error instanceof Error ? error.message : '检查失败'
+        }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     // 处理批量 AI 交易分类请求
     if (url.pathname === '/api/batch-categorize' && request.method === 'POST') {
       try {

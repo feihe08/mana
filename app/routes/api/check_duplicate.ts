@@ -5,13 +5,13 @@
  * 接收文件哈希，返回是否重复
  */
 
-import type { Route } from './+types/api.check_duplicate';
 import { getDB } from '../lib/server';
 import { checkFileDuplicate } from '../lib/utils/file-hash';
 
-export async function action({ request, context }: Route.ActionArgs) {
+export async function action(args: any) {
+  const request = args.request;
   try {
-    const db = getDB({ context });
+    const db = getDB(args);
     const body = await request.json() as { fileHash: string };
     const { fileHash } = body;
 
