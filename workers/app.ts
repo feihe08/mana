@@ -301,16 +301,48 @@ ${bills.map((b, i) => `${i + 1}. "${b.description}" (${Math.abs(b.amount)}元)`)
           }
         );
 
-        const responseText = response.response || response;
-        console.log('AI 响应:', responseText.substring(0, 500));
-
-        // 解析 AI 响应
-        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) {
-          throw new Error('Failed to parse AI response');
+        // 正确处理 Cloudflare AI 响应格式
+        let responseText: string;
+        if (typeof response === 'string') {
+          responseText = response;
+        } else if (response && typeof response === 'object') {
+          // Cloudflare AI 返回格式：{ response: string } 或 { result: { response: string } }
+          responseText = (response as any).response || (response as any).result?.response || JSON.stringify(response);
+        } else {
+          throw new Error('Invalid AI response format');
         }
 
-        const result = JSON.parse(jsonMatch[0]);
+        console.log('AI 响应类型:', typeof responseText);
+        console.log('AI 响应前500字符:', responseText.substring(0, 500));
+
+        // 解析 AI 响应 - 改进的 JSON 提取逻辑
+        let result;
+        try {
+          // 尝试直接解析（如果整个响应就是 JSON）
+          result = JSON.parse(responseText);
+        } catch (e) {
+          // 如果直接解析失败，尝试提取 JSON 对象
+          const jsonMatch = responseText.match(/\{[\s\S]*"categories"[\s\S]*\}/);
+          if (!jsonMatch) {
+            console.error('无法从 AI 响应中提取 JSON:', responseText);
+            throw new Error('AI 响应中未找到有效的 JSON 格式');
+          }
+
+          try {
+            result = JSON.parse(jsonMatch[0]);
+          } catch (parseError) {
+            console.error('JSON 解析失败:', jsonMatch[0]);
+            throw new Error('AI 返回的 JSON 格式无效');
+          }
+        }
+
+        // 验证结果格式
+        if (!result.categories || !Array.isArray(result.categories)) {
+          console.error('AI 响应格式错误，缺少 categories 数组:', result);
+          throw new Error('AI 响应格式错误：缺少 categories 数组');
+        }
+
+        console.log(`✅ 成功解析 ${result.categories.length} 条分类结果`);
 
         return new Response(JSON.stringify(result), {
           headers: {
@@ -320,8 +352,16 @@ ${bills.map((b, i) => `${i + 1}. "${b.description}" (${Math.abs(b.amount)}元)`)
         });
       } catch (error) {
         console.error('批量分类错误:', error);
+        console.error('错误堆栈:', error instanceof Error ? error.stack : 'N/A');
+
+        // 返回详细的错误信息
+        const errorMessage = error instanceof Error ? error.message : '批量分类失败';
+        const errorDetails = error instanceof Error ? error.stack : String(error);
+
         return new Response(JSON.stringify({
-          error: error instanceof Error ? error.message : '批量分类失败'
+          error: errorMessage,
+          details: errorDetails,
+          timestamp: new Date().toISOString(),
         }), {
           status: 500,
           headers: { 'Content-Type': 'application/json' },

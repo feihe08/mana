@@ -170,14 +170,26 @@ async function categorizeByAI(
     if (!request.ok) {
       // 尝试读取错误响应
       let errorMsg = request.statusText;
+      let errorDetails = '';
+
       try {
-        const errorData = await request.json() as { error?: string };
+        const errorData = await request.json() as { error?: string; details?: string };
         errorMsg = errorData.error || errorMsg;
+        errorDetails = errorData.details || '';
       } catch (e) {
-        // 无法解析错误响应，使用 statusText
+        // 尝试读取文本响应
+        try {
+          const textResponse = await request.text();
+          errorDetails = textResponse.substring(0, 500);
+        } catch (textError) {
+          // 无法读取响应
+        }
       }
 
       console.error('❌ [categorizeByAI] AI 请求失败:', request.status, errorMsg);
+      if (errorDetails) {
+        console.error('错误详情:', errorDetails);
+      }
       return new Map();
     }
 
