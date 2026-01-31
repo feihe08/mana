@@ -39,8 +39,11 @@ export function detectAnomalousBills(
     const diff = bill.amount - categoryStats.average;
     const ratio = Math.abs(diff) / categoryStats.average;
 
-    // 检测异常高额支出
-    if (bill.amount > categoryStats.max * 1.5) {
+    // 检测异常高额支出：计算该类别除当前账单外的其他账单的最大值
+    const otherBillsInCategory = bills.filter(b => b.category === bill.category && b.id !== bill.id);
+    const maxWithoutCurrent = Math.max(...otherBillsInCategory.map(b => b.amount));
+
+    if (bill.amount > maxWithoutCurrent * 1.5) {
       anomalies.push({
         billId: bill.id,
         reason: `单笔支出 ${bill.amount.toFixed(2)} 元远超该类别平均值 ${categoryStats.average.toFixed(2)} 元`,

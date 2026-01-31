@@ -24,10 +24,20 @@ async function readFileAsText(file: File): Promise<string> {
     return XLSX.utils.sheet_to_csv(worksheet);
   }
 
-  // CSV 文件 - 支付宝使用 GB18030 编码
+  // CSV 文件 - 尝试使用 GB18030 编码，失败则使用 UTF-8
   const buffer = await file.arrayBuffer();
-  const decoder = new TextDecoder('gb18030');
-  return decoder.decode(buffer);
+  try {
+    const decoder = new TextDecoder('gb18030');
+    const text = decoder.decode(buffer);
+    // 验证是否包含预期的表头，避免误识别
+    if (text.includes('交易时间') && text.includes('交易分类')) {
+      return text;
+    }
+    // 如果不包含预期的中文表头，可能是 UTF-8 编码
+    return new TextDecoder('utf-8').decode(buffer);
+  } catch {
+    return new TextDecoder('utf-8').decode(buffer);
+  }
 }
 
 export async function parseAlipayCSV(file: File): Promise<ParsedBill[]> {
