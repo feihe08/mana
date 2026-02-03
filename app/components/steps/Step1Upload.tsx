@@ -34,8 +34,6 @@ export function Step1Upload({
 }: Step1UploadProps) {
   const [dragActive, setDragActive] = React.useState(false);
   const [fileStatuses, setFileStatuses] = useState<Map<string, FileStatus>>(new Map());
-  // 用于重置 input 元素的 key
-  const [inputKey, setInputKey] = useState(0);
 
   // 检查文件是否重复 - 使用 ref 避免闭包问题
   const checkFileDuplicateRef = useRef(async (file: File) => {
@@ -112,8 +110,8 @@ export function Step1Upload({
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
     onFilesChange([...files, ...selectedFiles]);
-    // 重置 input 元素，以便下次可以选择同一个文件
-    setInputKey(prev => prev + 1);
+    // 直接清除 input 的 value，确保下次选择同一文件时 onChange 会触发
+    e.target.value = '';
   };
 
   const removeFile = (index: number) => {
@@ -127,8 +125,6 @@ export function Step1Upload({
       newMap.delete(fileKey);
       return newMap;
     });
-    // 重置 input 元素，以便下次可以选择同一个文件
-    setInputKey(prev => prev + 1);
   };
 
   // 检查是否有重复文件
@@ -157,7 +153,6 @@ export function Step1Upload({
           `}
         >
           <input
-            key={inputKey}
             type="file"
             multiple
             accept=".csv,.xlsx,.xls"
