@@ -12,4 +12,5 @@ export default [
   route("/api/delete-upload", "routes/api.delete-upload.ts"),
   route("/api/download", "routes/api.download.ts"),
   route("/api/download-raw", "routes/api.download-raw.ts"),
+  route("/api/check-duplicate", "routes/api.check-duplicate.ts"),
 ] satisfies RouteConfig;

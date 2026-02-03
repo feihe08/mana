@@ -2,7 +2,7 @@
  * 步骤 1：上传文件组件
  */
 
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { calculateFileHash } from '../../lib/utils/file-hash';
 
 interface Step1UploadProps {
@@ -34,9 +34,11 @@ export function Step1Upload({
 }: Step1UploadProps) {
   const [dragActive, setDragActive] = React.useState(false);
   const [fileStatuses, setFileStatuses] = useState<Map<string, FileStatus>>(new Map());
+  // 用于重置 input 元素的 key
+  const [inputKey, setInputKey] = useState(0);
 
-  // 检查文件是否重复
-  const checkFileDuplicate = useCallback(async (file: File) => {
+  // 检查文件是否重复 - 使用 ref 避免闭包问题
+  const checkFileDuplicateRef = useRef(async (file: File) => {
     const fileKey = `${file.name}-${file.size}`;
 
     // 设置检查中状态
@@ -57,7 +59,10 @@ export function Step1Upload({
         body: JSON.stringify({ fileHash }),
       });
 
-      const result = await response.json();
+      const result = await response.json() as {
+        isDuplicate: boolean;
+        existingUpload?: DuplicateInfo;
+      };
 
       // 更新状态
       setFileStatuses(prev => new Map(prev).set(fileKey, {
@@ -75,17 +80,15 @@ export function Step1Upload({
         isDuplicate: false,
       }));
     }
-  }, []);
+  });
 
   // 当文件列表变化时，检查新文件
   useEffect(() => {
     files.forEach(file => {
-      const fileKey = `${file.name}-${file.size}`;
-      if (!fileStatuses.has(fileKey)) {
-        checkFileDuplicate(file);
-      }
+      // 每次都重新检测
+      checkFileDuplicateRef.current(file);
     });
-  }, [files, fileStatuses, checkFileDuplicate]);
+  }, [files]);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -109,6 +112,8 @@ export function Step1Upload({
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
     onFilesChange([...files, ...selectedFiles]);
+    // 重置 input 元素，以便下次可以选择同一个文件
+    setInputKey(prev => prev + 1);
   };
 
   const removeFile = (index: number) => {
@@ -122,6 +127,8 @@ export function Step1Upload({
       newMap.delete(fileKey);
       return newMap;
     });
+    // 重置 input 元素，以便下次可以选择同一个文件
+    setInputKey(prev => prev + 1);
   };
 
   // 检查是否有重复文件
@@ -150,6 +157,7 @@ export function Step1Upload({
           `}
         >
           <input
+            key={inputKey}
             type="file"
             multiple
             accept=".csv,.xlsx,.xls"
