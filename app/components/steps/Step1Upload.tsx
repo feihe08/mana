@@ -34,6 +34,7 @@ export function Step1Upload({
 }: Step1UploadProps) {
   const [dragActive, setDragActive] = React.useState(false);
   const [fileStatuses, setFileStatuses] = useState<Map<string, FileStatus>>(new Map());
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 检查文件是否重复 - 使用 ref 避免闭包问题
   const checkFileDuplicateRef = useRef(async (file: File) => {
@@ -108,15 +109,37 @@ export function Step1Upload({
   }, [files, onFilesChange]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('[Step1Upload] handleFileSelect triggered');
+    console.log('[Step1Upload] e.target.files:', e.target.files);
+    console.log('[Step1Upload] current files:', files);
+
     const selectedFiles = Array.from(e.target.files || []);
+    console.log('[Step1Upload] selectedFiles:', selectedFiles.map(f => f.name));
+
+    if (selectedFiles.length === 0) {
+      console.log('[Step1Upload] No files selected, returning');
+      return;
+    }
+
     onFilesChange([...files, ...selectedFiles]);
-    // 直接清除 input 的 value，确保下次选择同一文件时 onChange 会触发
+
+    // 清除 input 的 value，确保下次选择同一文件时 onChange 会触发
+    // 使用 ref 和 e.target 双重保险
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+      console.log('[Step1Upload] input value cleared via ref');
+    }
     e.target.value = '';
+    console.log('[Step1Upload] input value cleared via e.target');
   };
 
   const removeFile = (index: number) => {
+    console.log('[Step1Upload] removeFile called, index:', index);
+    console.log('[Step1Upload] current files before remove:', files.map(f => f.name));
+
     const removedFile = files[index];
     const fileKey = `${removedFile.name}-${removedFile.size}`;
+    console.log('[Step1Upload] removing file:', removedFile.name, 'fileKey:', fileKey);
 
     // 移除文件和状态
     onFilesChange(files.filter((_, i) => i !== index));
@@ -125,6 +148,14 @@ export function Step1Upload({
       newMap.delete(fileKey);
       return newMap;
     });
+
+    // 清除 input 的 value，确保可以重新选择同一文件
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+      console.log('[Step1Upload] input value cleared in removeFile');
+    }
+
+    console.log('[Step1Upload] file removed');
   };
 
   // 检查是否有重复文件
@@ -153,6 +184,7 @@ export function Step1Upload({
           `}
         >
           <input
+            ref={fileInputRef}
             type="file"
             multiple
             accept=".csv,.xlsx,.xls"
